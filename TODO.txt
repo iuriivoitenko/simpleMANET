@@ -1,0 +1,5 @@
+TODO: 
+waypoint class
+loss model
+link model
+throughput graph
