@@ -39,7 +39,7 @@ classdef Node < handle
     %   Detailed explanation goes here
     properties ( Access = private )
         inited = 0;
-        connected = 0;
+        connected = 0;        
     end
     properties
         id
@@ -102,7 +102,7 @@ classdef Node < handle
       
       % this function determines whether new packet should be generated or not, called every time simulation is paused
       % packets can be generated either by timeout or fetched from tx queue
-      function out = generate_pkt(obj, t, delay)
+      function [out, p] = generate_pkt(obj, t, delay, p)
           
           if obj.uptime > t
               out = '';
@@ -145,11 +145,19 @@ classdef Node < handle
           % ************************************************
           % Place to add custom protocol timeout function
           % ************************************************
+          %  if isempty(obj.proto1) == 0
+          %    obj.proto1 = obj.proto1.timeout(delay, t);
+          %    if obj.proto1.result > 0 % packet generated on timeout              
+          %        obj.send_pkt(obj.proto1);
+          %    end    
+          %  end
+          %
           
           % Process outgoing queue
           if obj.queue.NumElements() > 0
               while obj.queue.NumElements() > 0
-                  pkt = obj.queue.remove();              
+                  pkt = obj.queue.remove(); 
+                  p = p + 1;
                   obj.packets.sent = obj.packets.sent + 1; 
                   obj.bytes.sent = obj.bytes.sent + pkt.len;
                   out = pkt.type;
@@ -160,30 +168,30 @@ classdef Node < handle
                           case 'NEIGHBOR'
                               switch pkt.type
                                   case 'HELLO'
-                                        fprintf('time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.hello.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.hello.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
                                   case 'ADVERT'
-                                        fprintf('time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.advert.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.advert.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
                                   otherwise
-                                        fprintf('time: %d ms, SRC: %d, DST: %d, NEIGHBOR packet unknown\n', t, pkt.src, pkt.dst);
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, NEIGHBOR packet unknown\n', p, t, pkt.src, pkt.dst);
                               end
                           case 'HLMRP'
-                              fprintf('time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, seq=%d, ttl=%d, hops=%d \n', t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.seq, pkt.ttl, pkt.hops);
+                              fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, seq=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.seq, pkt.ttl, pkt.hops);
                           case 'ODMRP'
                               switch pkt.type 
                                   case 'JOIN REQ'
-                                        fprintf('time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, prev=%d, hops=%d, ttl=%d \n', t, pkt.src, pkt.dst, pkt.protoname, out, pkt.seq, pkt.prev, pkt.hops, pkt.ttl);
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, prev=%d, hops=%d, ttl=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.seq, pkt.prev, pkt.hops, pkt.ttl);
                                   case 'JOIN TABLE'
-                                        fprintf('time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, count=%d, nonce=%d, group=%s \n', t, pkt.src, pkt.dst, pkt.protoname, out, pkt.count, pkt.jtable.reserved, pkt.mgroup);                                 
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, count=%d, nonce=%d, group=%s \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.count, pkt.jtable.reserved, pkt.mgroup);                                 
                                   case 'DATA'
                                         %out = strcat(pkt.type,':',num2str(pkt.dataseq));
-                                        fprintf('time: %d ms, SRC: %d, DST: %s, PROTO: %s, type=%s, seq=%d, len=%d, last=%d \n', t, pkt.src, pkt.dst, pkt.protoname, out, pkt.dataseq, pkt.len, pkt.prev);
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %s, PROTO: %s, type=%s, seq=%d, len=%d, last=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.dataseq, pkt.len, pkt.prev);
                                   otherwise
-                                        fprintf('time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', t, pkt.src, pkt.dst);
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', p, t, pkt.src, pkt.dst);
                               end
                           % case 'NEWPROTO'
                           %     fprintf('bla bla bla\n');
                           otherwise
-                              fprintf('time: %d ms, UNKNOWN PROTOCOL\n', t);
+                              fprintf('%d. time: %d ms, UNKNOWN PROTOCOL\n', p, t);
                       end
                   end                  
               end
@@ -196,7 +204,6 @@ classdef Node < handle
           % we put outgoing packet in the tx queue 
           obj.curproto = pkt.protoname;
           obj.queue.add(pkt);
-          %fprintf('id: %d enqueued total=%d pkts\n', obj.id, obj.queue.NumElements());
       end
 
       function rcvd_pkt(obj,src,~)                             
@@ -205,20 +212,18 @@ classdef Node < handle
           switch src.curproto
               case 'NEIGHBOR'
                   obj.bytes.rcvd = obj.bytes.rcvd + src.neighbor.len;
-                  %fprintf('rcvd_pkt by %d, src=%d, dst=%d, ttl=%d; ', obj.id, src.neighbor.src, src.neighbor.dst, src.neighbor.ttl);
-                  obj.neighbor = obj.neighbor.process_data(src.neighbor);          
-                  %fprintf('reply=%d bytes\n', obj.neighbor.result);          
+                  obj.neighbor = obj.neighbor.process_data(src.neighbor);               
                   if obj.neighbor.result > 0
                       obj.send_pkt(obj.neighbor);
                   elseif obj.neighbor.result < 0
                       obj.packets.droped = obj.packets.droped + 1;
                   end
               case 'HLMRP'
-                  obj.bytes.rcvd = obj.bytes.rcvd + src.hlmrp.len;
                   % HLMRP process packet if not NODE
+                  obj.bytes.rcvd = obj.bytes.rcvd + src.hlmrp.len;
+                  
                   if obj.neighbor.cluster ~= Cluster.NODE
                       [obj.hlmrp, src.hlmrp] = obj.hlmrp.process_data(src.hlmrp);   
-                      %fprintf('HLMRP seq=%d process result=%d\n', obj.hlmrp.seq, obj.hlmrp.result); 
                       if obj.hlmrp.result > 0
                           obj.send_pkt(src.hlmrp);
                       elseif obj.hlmrp.result <= 0
@@ -228,12 +233,11 @@ classdef Node < handle
               case 'ODMRP'
                   % ODMRP process packet 
                   obj.bytes.rcvd = obj.bytes.rcvd + src.odmrp.len;
+                  
                   [obj.odmrp, src.odmrp] = obj.odmrp.process_data(src.odmrp);   
-                  %fprintf('HLMRP seq=%d process result=%d\n', obj.hlmrp.seq, obj.hlmrp.result); 
                   if obj.odmrp.result > 0
                       obj.send_pkt(obj.odmrp);
                   elseif obj.odmrp.result <= 0
-                      %fprintf('%d processed data, type=%s, res=%d\n', obj.id, obj.odmrp.type, obj.odmrp.result);
                       obj.packets.droped = obj.packets.droped + 1;
                   end       
                            

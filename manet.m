@@ -36,18 +36,17 @@
 
 clear Nodes;
 
-%% simulation options -----------------------------------------
-showtext = 1;
-showmoretext = 1;
-showlines = 1;
-showsender = 1;
-showalledges = 0;
-showroutetable = 1;
-printstat = 1;
+%% visualization options --------------------------------------
+showtext = 1;        % show type of a sent packet
+showmoretext = 1;    % show supplementary info of the Node (bottom left to the Node)
+showlines = 1;       % show line when packet sent 
+showsender = 1;      % show circle around transmitting Node
+showalledges = 0;    % show connectivity on the topology
+printstat = 1;       % print detailed statistics after simulation
 
 %% simulation constants ---------------------------------------
 NODES = 10;           % total nodes in simulation
-S = 1;                % total senders in simulation
+S = 2;                % total senders in simulation
 R = 5;                % total receivers in simulation
 
 %% global variables -------------------------------------------
@@ -56,11 +55,12 @@ SAMPLING = 10;        % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
 SPEED = 0;            % max speed of movement, m/s
-RADIO = 800;          % range of the , m
+RADIO = 800;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
 UP = SIMTIME / 10;    % when nodes wake up, ms
 
 %% runtime vars -----------------------------------------------
+P = 0;                              % total packets generated in the simulation
 L = randi([0 LOSS],1,NODES);        % node loss matrix
 U = randi([0 UP],1,NODES);          % node start time matrix
 E = randi([0 100],1,NODES);         % node energy matrix
@@ -68,7 +68,7 @@ M = randi([0 SPEED],1,NODES);       % node mobility matrix
 D = randi([0 360],1,NODES);         % node direction matrix, degrees
 Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
-%% Protocols use in this simulation ---------------------------
+%% Protocols used in this simulation --------------------------
 Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
 
 %% Agents used in this simulation -----------------------------
@@ -110,20 +110,25 @@ for t = 1:SAMPLING:SIMTIME
         
         
         % now, process output queue for new packets
-        message = Nodes(j).generate_pkt(t,SAMPLING);
+        [message, P] = Nodes(j).generate_pkt(t,SAMPLING,P);
                 
         % plot sender related info once
         if showmoretext == 1
+            % Neighbor protocol info, show how many 1-hop neighbors and clusters we have
             if ~isempty(Nodes(j).neighbor)
-            s = size(Nodes(j).neighbor.ids);
-            for i=1:s(2)
-                text(Nodes(j).x-50,Nodes(j).y-(40*i), num2str(Nodes(j).neighbor.ids(i),'%d'),'FontSize',8,'Color','b');
+                s = size(Nodes(j).neighbor.ids);
+                for i=1:s(2)
+                    text(Nodes(j).x-50,Nodes(j).y-(40*i), num2str(Nodes(j).neighbor.ids(i),'%d'),'FontSize',8,'Color','b');
+                end
             end
-            end
-            
+            % ODMRP protocol info, show FORWARDING_FLAG and number of entries in Member_table 
             if ~isempty(Nodes(j).odmrp)
                 text(Nodes(j).x-50,Nodes(j).y-(100), strcat(num2str(Nodes(j).odmrp.FORWARDING_GROUP_FLAG,'%d'),':',num2str(Nodes(j).odmrp.member_table.Count)),'FontSize',8,'Color','b');                
             end
+            % custom proto1 info on the topology graph
+            % if ~isempty(Nodes(j).proto1)
+            %
+            % end
         end
         if showsender == 1 && ~isempty(message)
             circle2(Nodes(j).x,Nodes(j).y,30); % highlight the tx node
@@ -159,94 +164,6 @@ end
 
 %% print statistics
 if printstat == 1
-pdr = 0; % packet delivery ratio (throughput). data rcvd / data sent
-cov = 0; % control overhead. ctrl bytes sent / data bytes rcvd
-fef = 0; % forwarding efficiency. data + ctrl packets sent / data packets rcvd
-
-cov_ctrl_bytes_sent = 0;
-cov_data_bytes_rcvd = 0;
-psent = 0;
-prelay = 0;
-prcvd = 0;
-pdrop = 0;
-bsent = 0;
-brcvd = 0;
-fprintf('\r\n--- SIMULATION STATISTICS ---\r\n');
-for i=1:NODES    
-    psent = psent + Nodes(1,i).packets.sent;
-    prcvd = prcvd + Nodes(1,i).packets.rcvd;
-    pdrop = pdrop + Nodes(1,i).packets.droped;
-    bsent = bsent + Nodes(1,i).bytes.sent;
-    brcvd = brcvd + Nodes(1,i).bytes.rcvd;
-    if ismember('ODMRP',Protocols)
-        fprintf('ODMRP protocol statistics, node %d\n', i);
-        prelay = prelay + Nodes(i).odmrp.packets.ctrl.relayed + Nodes(i).odmrp.packets.data.relayed;
-        if showroutetable == 1
-            message_cache = Nodes(1,i).odmrp.message_cache;
-        end
-        data_packets = Nodes(i).odmrp.packets.data;
-        ctrl_packets = Nodes(i).odmrp.packets.ctrl;
-        data_bytes = Nodes(i).odmrp.bytes.data;
-        ctrl_bytes = Nodes(i).odmrp.bytes.ctrl;
-        
-        data_pkt_rcvd = data_packets.rcvd;
-        data_pkt_sent = data_packets.sent;
-        
-        % 1. PDR
-        packet_delivery_ratio = Nodes(i).odmrp.packets.data.rcvd / ((SIMTIME-Nodes(i).uptime) / Apps.period)
-        pdr = packet_delivery_ratio + pdr;
-        
-        % 2. COV
-        ctrl_bytes_sent = Nodes(i).odmrp.bytes.ctrl.sent;
-        data_bytes_rcvd = Nodes(i).odmrp.bytes.data.rcvd;
-        control_overhead = ctrl_bytes_sent / data_bytes_rcvd;
-        cov_ctrl_bytes_sent = cov_ctrl_bytes_sent + ctrl_bytes_sent;
-        cov_data_bytes_rcvd = cov_data_bytes_rcvd + data_bytes_rcvd;
-        
-        % 3. FEF
-    end
-    if ismember('NEIGHBOR',Protocols)
-        fprintf('NEIGHBOR protocol\n');
-    end
-    if ismember('HLMRP',Protocols)
-        fprintf('HLMRP protocol\n');
-        if showroutetable == 1
-            Nodes(1,i).hlmrp.rtable.show
-        end
-    end
-%     fprintf('\rTotal per node %d\n', i);
-%     fprintf('packets sent: %d\n',  Nodes(i).packets.sent);
-%     fprintf('packets rcvd: %d\n',  Nodes(i).packets.rcvd);
-%     fprintf('packets drop: %d\n',  Nodes(i).packets.droped);
-%     fprintf('packets relayed: %d\n',  Nodes(i).packets.relayed);
-%     fprintf('bytes sent: %d\n',  Nodes(i).bytes.sent);
-%     fprintf('bytes rcvd: %d\n',  Nodes(i).bytes.rcvd);
-%    fprintf(' --------------------------------- \n');
-end
-fprintf('\rTotal packets sent: %d\n', (psent));
-fprintf('Total packets rcvd: %d\n', (prcvd));
-fprintf('Total packets drop: %d\n', (pdrop));
-if ismember('ODMRP',Protocols)
-    fprintf('Total packets relayed: %d\n', (prelay));
-end
-if ismember('NEIGHBOR',Protocols)
-    
-end
-if ismember('HLMRP',Protocols)    
-end
-fprintf('Total bytes sent: %d\n', (bsent));
-fprintf('Total bytes rcvd: %d\n', (brcvd));
-fprintf('\r\n ---  Protocol performance --- \n');
-if ismember('ODMRP',Protocols)
-    fprintf('packet delivery ratio %.2f\n', (pdr / R));
-    fprintf('control overhead %.2f\n', (cov_ctrl_bytes_sent / cov_data_bytes_rcvd));
-    fprintf('forwarding efficiency %.2f\n', (cov_ctrl_bytes_sent / cov_data_bytes_rcvd));
-end
-if ismember('NEIGHBOR',Protocols)
-    
-end
-if ismember('HLMRP',Protocols)
-    
-end
+    simstat(SIMTIME,Nodes,S,R,Protocols,Apps);
 end
 

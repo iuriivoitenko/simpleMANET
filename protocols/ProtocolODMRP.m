@@ -40,8 +40,8 @@ classdef ProtocolODMRP < ProtocolIP
         count
         mgroup
         result
-        packets
-        bytes
+        data
+        ctrl
         groups_tx
         groups_rx
         jreq        
@@ -65,12 +65,12 @@ classdef ProtocolODMRP < ProtocolIP
             obj.prev = 0;
             obj.result = 0;
             obj.datalen = 0;
-            obj.packets = struct('data',struct(),'ctrl',struct());
-            obj.packets.data = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
-            obj.packets.ctrl = struct('sent',0,'rcvd',0,'relayed',0,'droped',0);
-            obj.bytes = struct('data',struct(),'ctrl',struct());
-            obj.bytes.data = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
-            obj.bytes.ctrl = struct('sent',0,'rcvd',0,'relayed',0,'droped',0);            
+            obj.data = struct('packets',struct(),'bytes',struct());
+            obj.data.packets = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
+            obj.data.bytes = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
+            obj.ctrl = struct('packets',struct(),'bytes',struct());
+            obj.ctrl.packets = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
+            obj.ctrl.bytes = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);            
             obj.isSender = 0;
             obj.isReceiver = 0;
             obj.groups_tx = [];
@@ -196,8 +196,8 @@ classdef ProtocolODMRP < ProtocolIP
             obj.hops = 0;
             obj.prev = obj.jreq.prev;
             % update stats
-            obj.packets.ctrl.sent = obj.packets.ctrl.sent + 1;
-            obj.bytes.ctrl.sent = obj.bytes.ctrl.sent + obj.len;
+            obj.ctrl.packets.sent = obj.ctrl.packets.sent + 1;
+            obj.ctrl.bytes.sent = obj.ctrl.bytes.sent + obj.len;
         end
         
         function obj = send_join_table(obj, gr)                     
@@ -228,8 +228,8 @@ classdef ProtocolODMRP < ProtocolIP
             obj.count = obj.jtable.count;
             obj.mgroup = 'A';
             % update stats
-            obj.packets.ctrl.sent = obj.packets.ctrl.sent + 1;
-            obj.bytes.ctrl.sent = obj.bytes.ctrl.sent + obj.len;            
+            obj.ctrl.packets.sent = obj.ctrl.packets.sent + 1;
+            obj.ctrl.bytes.sent = obj.ctrl.bytes.sent + obj.len;            
         end 
 
         function obj = send_mdata(obj, gr)                     
@@ -241,15 +241,15 @@ classdef ProtocolODMRP < ProtocolIP
             obj.len = 40 + obj.datalen;
             % ODMRP level
             obj.type = 'DATA';
-            obj.dataseq = obj.packets.data.sent + 1;
+            obj.dataseq = obj.data.packets.sent + 1;
             
             % update visualization params
             obj.mgroup = 'A';
             obj.prev = obj.id;
             
             % update stats
-            obj.packets.data.sent = obj.packets.data.sent + 1;
-            obj.bytes.data.sent = obj.bytes.data.sent + obj.len;            
+            obj.data.packets.sent = obj.data.packets.sent + 1;
+            obj.data.bytes.sent = obj.data.bytes.sent + obj.len;            
         end         
         
         function [odmrp, pkt] = process_data(odmrp,pkt)
@@ -287,8 +287,8 @@ classdef ProtocolODMRP < ProtocolIP
             % ODMRP DRAFT, page 26
             % 5.1.2 Processing Join Request
             %
-            odmrp.packets.ctrl.rcvd = odmrp.packets.ctrl.rcvd + 1;
-            odmrp.bytes.ctrl.rcvd = odmrp.bytes.ctrl.rcvd + pkt.len;
+            odmrp.ctrl.packets.rcvd = odmrp.ctrl.packets.rcvd + 1;
+            odmrp.ctrl.bytes.rcvd = odmrp.ctrl.bytes.rcvd + pkt.len;
             
             % 1. Check if duplicate
             if odmrp.containsMessageCache(pkt.src, pkt.jreq.mgroup) == 0
@@ -310,8 +310,8 @@ classdef ProtocolODMRP < ProtocolIP
                     %fprintf('updated\n');
                 else
                     %fprintf('old value\n');
-                    odmrp.packets.ctrl.droped = odmrp.packets.ctrl.droped + 1;
-                    odmrp.bytes.ctrl.droped = odmrp.bytes.ctrl.droped + pkt.len;                     
+                    odmrp.ctrl.packets.droped = odmrp.ctrl.packets.droped + 1;
+                    odmrp.ctrl.bytes.droped = odmrp.ctrl.bytes.droped + pkt.len;                     
                     odmrp.result = -10;
                     return
                 end
@@ -331,8 +331,8 @@ classdef ProtocolODMRP < ProtocolIP
             
             % 5. Hop count >= TTL ? DROP
             if pkt.jreq.hops > odmrp.TTL_VALUE
-                odmrp.packets.ctrl.droped = odmrp.packets.ctrl.droped + 1;
-                odmrp.bytes.ctrl.droped = odmrp.bytes.ctrl.droped + pkt.len;                
+                odmrp.ctrl.packets.droped = odmrp.ctrl.packets.droped + 1;
+                odmrp.ctrl.bytes.droped = odmrp.ctrl.bytes.droped + pkt.len;                
                 odmrp.result = -20;
             else % 6. Relay
                 pkt.len = 56;
@@ -348,8 +348,8 @@ classdef ProtocolODMRP < ProtocolIP
                 odmrp.hops = pkt.jreq.hops;
                 odmrp.result = pkt.len;
                 % collect stats
-                odmrp.packets.ctrl.relayed = odmrp.packets.ctrl.relayed + 1;
-                odmrp.bytes.ctrl.relayed = odmrp.bytes.ctrl.relayed + pkt.len;
+                odmrp.ctrl.packets.relayed = odmrp.ctrl.packets.relayed + 1;
+                odmrp.ctrl.bytes.relayed = odmrp.ctrl.bytes.relayed + pkt.len;
             end 
         end
         
@@ -361,14 +361,14 @@ classdef ProtocolODMRP < ProtocolIP
                 % +++ reserved => nonce
                 if odmrp.updateReceiverTable(pkt.jtable.reserved) == 1               
                      odmrp.result = 0;
-                     odmrp.packets.ctrl.droped = odmrp.packets.ctrl.droped + 1;
-                     odmrp.bytes.ctrl.droped = odmrp.bytes.ctrl.droped + pkt.len;
+                     odmrp.ctrl.packets.droped = odmrp.ctrl.packets.droped + 1;
+                     odmrp.ctrl.bytes.droped = odmrp.ctrl.bytes.droped + pkt.len;
                      return
                 end
                
                 % collect stats
-                odmrp.packets.ctrl.rcvd = odmrp.packets.ctrl.rcvd + 1;
-                odmrp.bytes.ctrl.rcvd = odmrp.bytes.ctrl.rcvd + pkt.len;
+                odmrp.ctrl.packets.rcvd = odmrp.ctrl.packets.rcvd + 1;
+                odmrp.ctrl.bytes.rcvd = odmrp.ctrl.bytes.rcvd + pkt.len;
                 % set forwarding flag = 1 and originate own Join Table
                 odmrp.FORWARDING_GROUP_FLAG = 1;  
                 rows = strcmpi(odmrp.message_cache.src, num2str(odmrp.id));
@@ -388,14 +388,14 @@ classdef ProtocolODMRP < ProtocolIP
                     odmrp.prev = odmrp.id;
                     odmrp.result = pkt.len;
                     % collect stats
-                    odmrp.packets.ctrl.relayed = odmrp.packets.ctrl.relayed + 1;
-                    odmrp.bytes.ctrl.relayed = odmrp.bytes.ctrl.relayed + pkt.len;                
+                    odmrp.ctrl.packets.relayed = odmrp.ctrl.packets.relayed + 1;
+                    odmrp.ctrl.bytes.relayed = odmrp.ctrl.bytes.relayed + pkt.len;                
                     %fprintf('%d relay join table for %d\n', odmrp.id, pkt.id);
                 end
             else
                 odmrp.result = -6;
-                odmrp.packets.ctrl.droped = odmrp.packets.ctrl.droped + 1;
-                odmrp.bytes.ctrl.droped = odmrp.bytes.ctrl.droped + pkt.len;                 
+                odmrp.ctrl.packets.droped = odmrp.ctrl.packets.droped + 1;
+                odmrp.ctrl.bytes.droped = odmrp.ctrl.bytes.droped + pkt.len;                 
                 %fprintf('%d join table dropped for %d\n', odmrp.id, pkt.id);
             end            
         end        
@@ -409,12 +409,12 @@ classdef ProtocolODMRP < ProtocolIP
                 if odmrp.member_cache(rows,:).seq < pkt.dataseq;                    
                     odmrp.member_cache(rows,:).seq = pkt.dataseq;
                     if odmrp.isReceiver == 1
-                        odmrp.packets.data.rcvd = odmrp.packets.data.rcvd + 1;
-                        odmrp.bytes.data.rcvd = odmrp.bytes.data.rcvd + pkt.len; 
+                        odmrp.data.packets.rcvd = odmrp.data.packets.rcvd + 1;
+                        odmrp.data.bytes.rcvd = odmrp.data.bytes.rcvd + pkt.len; 
                     end
                 else
-                    odmrp.packets.data.dups = odmrp.packets.data.dups + 1;
-                    odmrp.bytes.data.dups = odmrp.bytes.data.dups + pkt.len;
+                    odmrp.data.packets.dups = odmrp.data.packets.dups + 1;
+                    odmrp.data.bytes.dups = odmrp.data.bytes.dups + pkt.len;
                     odmrp.result = 0;
                     return
                 end
@@ -429,11 +429,11 @@ classdef ProtocolODMRP < ProtocolIP
                 odmrp.len = pkt.len;
                 odmrp.result = pkt.len;
                 % collect stats
-                odmrp.packets.data.relayed = odmrp.packets.data.relayed + 1;
-                odmrp.bytes.data.relayed = odmrp.bytes.data.relayed + pkt.len;
+                odmrp.data.packets.relayed = odmrp.data.packets.relayed + 1;
+                odmrp.data.bytes.relayed = odmrp.data.bytes.relayed + pkt.len;
             else
-                odmrp.packets.data.droped = odmrp.packets.data.droped + 1;
-                odmrp.bytes.data.droped = odmrp.bytes.data.droped + pkt.len;                
+                odmrp.data.packets.droped = odmrp.data.packets.droped + 1;
+                odmrp.data.bytes.droped = odmrp.data.bytes.droped + pkt.len;                
                 odmrp.result = 0;    
             end            
         end
