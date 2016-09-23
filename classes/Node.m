@@ -53,14 +53,14 @@ classdef Node < handle
         packets
         bytes
         queue
-        speed
-        dir        
+        waypoint
         rxlisn
         curproto
         % 1. add custom protocol here
         neighbor
         hlmrp
         odmrp
+        % newproto
     end
     
     events
@@ -68,19 +68,18 @@ classdef Node < handle
     end
     
     methods
-      function obj = Node(id, x, y, speed, dir, uptime, loss, protocols, agent, apps)
+      function obj = Node(id, x, y, simtime, speed, uptime, loss, energy, protocols, agent, apps)
             obj.id = id;
             obj.color = [.5 .5 .5]; % gray by default
             obj.radius = 50;
             obj.x = x;
             obj.y = y;
             obj.loss = loss; % loss percent [0...1]
-            obj.speed = speed;
-            obj.dir = dir;
+            obj.waypoint = Waypoint(simtime, speed);
             obj.queue = Queue(100); % tx queue
             obj.packets = struct('sent',0,'rcvd',0,'droped',0,'relayed',0);
             obj.bytes = struct('sent',0,'rcvd',0);
-            obj.energy = 100;
+            obj.energy = energy;
             obj.uptime = uptime; 
             % 2. init protocol here
             p = size(protocols);
@@ -111,6 +110,7 @@ classdef Node < handle
               obj.color = [33 205 163] ./ 255;
               obj.inited = 1;
           else
+              obj.waypoint = obj.waypoint.timeout;
               if isempty(obj.neighbor) == 0
                   obj.color = obj.neighbor.colorNode;
               elseif isempty(obj.odmrp) == 0

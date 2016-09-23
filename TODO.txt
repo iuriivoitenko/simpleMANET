@@ -1,6 +1,5 @@
 TODO: 
-waypoint class
+throughput graph
 loss model
 link model
-throughput graph
 google maps layer under topology

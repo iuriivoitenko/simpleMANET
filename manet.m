@@ -46,7 +46,7 @@ printstat = 1;       % print detailed statistics after simulation
 
 %% simulation constants ---------------------------------------
 NODES = 10;           % total nodes in simulation
-S = 2;                % total senders in simulation
+S = 1;                % total senders in simulation
 R = 5;                % total receivers in simulation
 
 %% global variables -------------------------------------------
@@ -54,7 +54,7 @@ SIMTIME = 30 * 1000;  % simulation time, ms
 SAMPLING = 10;        % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
-SPEED = 0;            % max speed of movement, m/s
+SPEED = 10;           % max speed of movement, m/s
 RADIO = 800;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
 UP = SIMTIME / 10;    % when nodes wake up, ms
@@ -64,8 +64,8 @@ P = 0;                              % total packets generated in the simulation
 L = randi([0 LOSS],1,NODES);        % node loss matrix
 U = randi([0 UP],1,NODES);          % node start time matrix
 E = randi([0 100],1,NODES);         % node energy matrix
-M = randi([0 SPEED],1,NODES);       % node mobility matrix
-D = randi([0 360],1,NODES);         % node direction matrix, degrees
+% M = randi([0 SPEED],1,NODES);       % node mobility matrix
+% D = randi([0 360],1,NODES);         % node direction matrix, degrees
 Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
 %% Protocols used in this simulation --------------------------
@@ -79,12 +79,12 @@ Apps = struct('data','CBR','packetlen',512,'period',100);
 
 %% init nodes and plot topology -------------------------------
 for i=1:NODES
-    Nodes(i) = Node(i,Coord(i,1),Coord(i,2),M(i),D(i),U(i),L(i),Protocols,Agents(i),Apps);
+    Nodes(i) = Node(i,Coord(i,1),Coord(i,2),SIMTIME,SPEED,U(i),L(i),E(i),Protocols,Agents(i),Apps);
 end
 
 %% start descrete simulation ----------------------------------
 for t = 1:SAMPLING:SIMTIME
-    pause(DELAYPLOT/1000);              
+    pause(DELAYPLOT/1000);    
 
     % update topology matrix
     A = topology(Coord, RADIO, Nodes);    
@@ -96,7 +96,7 @@ for t = 1:SAMPLING:SIMTIME
     for j=1:NODES        
         
         % move node
-        [Coord(j,1),Coord(j,2)]=mobility(Nodes(j).x,Nodes(j).y,(Nodes(j).speed/1000*SAMPLING),Nodes(j).dir);       
+        [Coord(j,1),Coord(j,2)]=mobility(Nodes(j).x,Nodes(j).y,(Nodes(j).waypoint.speed/1000*SAMPLING),Nodes(j).waypoint.dir);       
         Nodes(j).setCoord(Coord(j,1),Coord(j,2));
         text(Nodes(j).x+10,Nodes(j).y-10,num2str(Nodes(j).id,'%d'));
         
