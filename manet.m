@@ -46,8 +46,8 @@ printstat = 1;       % print detailed statistics after simulation
 
 %% simulation constants ---------------------------------------
 NODES = 10;           % total nodes in simulation
-S = 1;                % total senders in simulation
-R = 5;                % total receivers in simulation
+SENDERS = 1;          % total senders in simulation
+RECEIVERS = 3;        % total receivers in simulation
 
 %% global variables -------------------------------------------
 SIMTIME = 30 * 1000;  % simulation time, ms
@@ -64,15 +64,13 @@ P = 0;                              % total packets generated in the simulation
 L = randi([0 LOSS],1,NODES);        % node loss matrix
 U = randi([0 UP],1,NODES);          % node start time matrix
 E = randi([0 100],1,NODES);         % node energy matrix
-% M = randi([0 SPEED],1,NODES);       % node mobility matrix
-% D = randi([0 360],1,NODES);         % node direction matrix, degrees
 Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
 %% Protocols used in this simulation --------------------------
 Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
 
 %% Agents used in this simulation -----------------------------
-Agents = agentrole(NODES,S,R);  % 0 - no data traffic, 1 - multicast receiver, 2 - multicast sender
+Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - multicast receiver, 2 - multicast sender
 
 %% Applications used in this simulation -----------------------
 Apps = struct('data','CBR','packetlen',512,'period',100);
@@ -164,6 +162,6 @@ end
 
 %% print statistics
 if printstat == 1
-    simstat(SIMTIME,Nodes,S,R,Protocols,Apps);
+    simstat(SIMTIME,Nodes,SENDERS,RECEIVERS,Protocols,Apps);
 end
 

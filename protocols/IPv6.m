@@ -1,4 +1,4 @@
-classdef ProtocolIP 
+classdef IPv6 
     % ProtocolIP Summary of this class goes here
     % simplified representation of IPv6 protocol
     

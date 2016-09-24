@@ -1,4 +1,4 @@
-classdef ProtocolODMRP < ProtocolIP
+classdef ODMRP < IPv6
     % ODMRP Summary of this class goes here
     % This class represents ODMRP protocol logic taken from 
     % www.cs.ucla.edu/classes/fall03/cs218/paper/odmrp-wcnc99.pdf
@@ -55,7 +55,7 @@ classdef ProtocolODMRP < ProtocolIP
     end
     
     methods
-        function obj = ProtocolODMRP(id, agent, app)
+        function obj = ODMRP(id, agent, app)
             obj.id = id;
             obj.timer = 0;
             obj.fgtimer = 0;

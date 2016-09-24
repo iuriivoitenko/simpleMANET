@@ -88,9 +88,9 @@ classdef Node < handle
                     case 'NEIGHBOR'
                         obj.neighbor = Neighbor(id); 
                     case 'HLMRP'
-                        obj.hlmrp = ProtocolHLMRP(id);
+                        obj.hlmrp = HLMRP(id);
                     case 'ODMRP'
-                        obj.odmrp = ProtocolODMRP(id, agent, apps);
+                        obj.odmrp = ODMRP(id, agent, apps);
                     % case 'NEWPROTO'
                     %   obj.newproto = NewProto(id);
                     otherwise

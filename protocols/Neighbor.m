@@ -34,7 +34,7 @@
 %
 %****************************************************************************/
  
-classdef Neighbor < ProtocolIP
+classdef Neighbor < IPv6
     % Neighbor Summary of this class goes here
     % This class represents 1-hop neighbor discovery and clastering
     properties (Constant)

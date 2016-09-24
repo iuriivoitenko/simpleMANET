@@ -34,7 +34,7 @@
 %
 %****************************************************************************/
 
-classdef ProtocolHLMRP < ProtocolIP
+classdef HLMRP < IPv6
     % HLMRP Summary of this class goes here
     % HLMRP: hop limited multicast routing protocol
     % this class represents the protocol logic

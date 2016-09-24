@@ -1,13 +1,11 @@
 function [out] = simstat( SIMTIME, Nodes, S, R, Protocols, Apps )
-%UNTITLED Summary of this function goes here
+%   Summary of this function goes here
 %   Detailed explanation goes here
 
 pdr = 0; % packet delivery ratio (throughput). data rcvd / data sent
 cov = 0; % control overhead. ctrl bytes sent / data bytes rcvd
 fef = 0; % forwarding efficiency. data + ctrl packets sent / data packets rcvd
 
-cov_ctrl_bytes_sent = 0;
-cov_data_bytes_rcvd = 0;
 psent = 0;
 prelay = 0;
 prcvd = 0;
@@ -15,19 +13,23 @@ pdrop = 0;
 bsent = 0;
 brcvd = 0;
 N = numel(Nodes);
-fprintf('\r\n--- SIMULATION STATISTICS ---\r\n');
-for i=1:N  
-    
+
+for i=1:N
     psent = psent + Nodes(i).packets.sent;
     prcvd = prcvd + Nodes(i).packets.rcvd;
     pdrop = pdrop + Nodes(i).packets.droped;
     bsent = bsent + Nodes(i).bytes.sent;
     brcvd = brcvd + Nodes(i).bytes.rcvd;
-    
     if ismember('ODMRP',Protocols)
-        fprintf('ODMRP protocol statistics, node %d\n', i);
         prelay = prelay + Nodes(i).odmrp.ctrl.packets.relayed + Nodes(i).odmrp.data.packets.relayed;
-        message_cache = Nodes(i).odmrp.message_cache;
+    end
+end
+    
+fprintf('\r\n--- SIMULATION STATISTICS ---\n');
+for i=1:N         
+    if ismember('ODMRP',Protocols)
+        %fprintf('ODMRP protocol statistics, node %d\n', i);        
+        %message_cache = Nodes(i).odmrp.message_cache;
         
         data_packets = Nodes(i).odmrp.data.packets;
         ctrl_packets = Nodes(i).odmrp.ctrl.packets;
@@ -35,15 +37,23 @@ for i=1:N
         ctrl_bytes = Nodes(i).odmrp.ctrl.bytes;
         
         % 1. PDR
-        packet_delivery_ratio = data_packets.rcvd / ((SIMTIME-Nodes(i).uptime) / Apps.period)
-        pdr = packet_delivery_ratio + pdr;
+        if Nodes(i).odmrp.isReceiver == 1
+            packet_delivery_ratio = data_packets.rcvd / ((SIMTIME-Nodes(i).uptime) / Apps.period);
+            pdr = packet_delivery_ratio + pdr;
+        end
         
         % 2. COV
-        control_overhead = ctrl_bytes.sent / data_bytes.rcvd;
-        cov_ctrl_bytes_sent = cov_ctrl_bytes_sent + ctrl_bytes.sent;
-        cov_data_bytes_rcvd = cov_data_bytes_rcvd + data_bytes.rcvd;
+        if data_bytes.rcvd > 0
+            control_overhead = double(ctrl_bytes.sent + (data_packets.sent * 40)) / double(data_bytes.rcvd);
+            cov = control_overhead + cov;
+        end
         
         % 3. FEF
+        if data_packets.rcvd > 0
+            forw_eff = (data_packets.sent + data_packets.relayed + ctrl_packets.sent + ctrl_packets.relayed) / data_packets.rcvd;
+            fef = forw_eff + fef;
+        end
+        
     end
     if ismember('NEIGHBOR',Protocols)
         fprintf('NEIGHBOR protocol\n');
@@ -75,11 +85,11 @@ end
 fprintf('Total bytes sent: %d\n', (bsent));
 fprintf('Total bytes rcvd: %d\n', (brcvd));
 
-fprintf('\r\n ---  Protocol performance --- \n');
 if ismember('ODMRP',Protocols)
-    fprintf('packet delivery ratio %.2f\n', (pdr / R));
-    fprintf('control overhead %.2f\n', (cov_ctrl_bytes_sent / cov_data_bytes_rcvd));
-    fprintf('forwarding efficiency %.2f\n', (cov_ctrl_bytes_sent / cov_data_bytes_rcvd));
+    fprintf('\r ---  ODMRP protocol performance --- \n');
+    fprintf('packet delivery ratio: %.2f\n', (pdr / R));
+    fprintf('control overhead: %.2f\n', (cov / R));
+    fprintf('forwarding efficiency: %.2f\n', (fef / R));
 end
 if ismember('NEIGHBOR',Protocols)
     
