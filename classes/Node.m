@@ -39,7 +39,8 @@ classdef Node < handle
     %   Detailed explanation goes here
     properties ( Access = private )
         inited = 0;
-        connected = 0;        
+        connected = 0;   
+        debug = 1;             % show debug text
     end
     properties
         id
@@ -88,7 +89,7 @@ classdef Node < handle
                     case 'NEIGHBOR'
                         obj.neighbor = Neighbor(id); 
                     case 'HLMRP'
-                        obj.hlmrp = HLMRP(id);
+                        obj.hlmrp = HLMRP(id, agent, apps);
                     case 'ODMRP'
                         obj.odmrp = ODMRP(id, agent, apps);
                     % case 'NEWPROTO'
@@ -166,7 +167,8 @@ classdef Node < handle
                   if ~isempty(out)
                       switch pkt.protoname
                           case 'NEIGHBOR'
-                              switch pkt.type
+                              if pkt.debug == 1
+                              switch pkt.type                                  
                                   case 'HELLO'
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.hello.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
                                   case 'ADVERT'
@@ -174,9 +176,20 @@ classdef Node < handle
                                   otherwise
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %d, NEIGHBOR packet unknown\n', p, t, pkt.src, pkt.dst);
                               end
+                              end
                           case 'HLMRP'
-                              fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, seq=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.seq, pkt.ttl, pkt.hops);
+                              if pkt.debug == 1
+                              switch pkt.type
+                                  case 'HEARTBEAT'
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.nonce, pkt.ttl, pkt.hops);
+                                  case 'DATA'
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.hbeat.nonce, pkt.hbeat.ttl, pkt.hbeat.hops);                                  
+                                  otherwise
+                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, HLMRP packet unknown\n', p, t, pkt.src, pkt.dst);
+                              end
+                              end
                           case 'ODMRP'
+                              if pkt.debug == 1
                               switch pkt.type 
                                   case 'JOIN REQ'
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, prev=%d, hops=%d, ttl=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.seq, pkt.prev, pkt.hops, pkt.ttl);
@@ -187,6 +200,7 @@ classdef Node < handle
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %s, PROTO: %s, type=%s, seq=%d, len=%d, last=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.dataseq, pkt.len, pkt.prev);
                                   otherwise
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', p, t, pkt.src, pkt.dst);
+                              end
                               end
                           % case 'NEWPROTO'
                           %     fprintf('bla bla bla\n');
@@ -225,7 +239,7 @@ classdef Node < handle
                   if obj.neighbor.cluster ~= Cluster.NODE
                       [obj.hlmrp, src.hlmrp] = obj.hlmrp.process_data(src.hlmrp);   
                       if obj.hlmrp.result > 0
-                          obj.send_pkt(src.hlmrp);
+                          obj.send_pkt(obj.hlmrp);
                       elseif obj.hlmrp.result <= 0
                           obj.packets.droped = obj.packets.droped + 1;
                       end       

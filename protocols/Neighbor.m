@@ -42,11 +42,12 @@ classdef Neighbor < IPv6
         cl_gate_color = [1 1 0];
         cl_lead_color = [33 205 163] ./ 255;
         neighlifetime = 15000; % neighbor valid, ms
+        debug = 1;             % show protocol packets in the debug window
     end
     
     properties ( Access = private )
         id                     % same id as node        
-        period                 % timeout interval, ms
+        period                 % timeout interval, ms        
     end
     
     properties        

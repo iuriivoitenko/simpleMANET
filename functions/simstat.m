@@ -5,6 +5,7 @@ function [out] = simstat( SIMTIME, Nodes, S, R, Protocols, Apps )
 pdr = 0; % packet delivery ratio (throughput). data rcvd / data sent
 cov = 0; % control overhead. ctrl bytes sent / data bytes rcvd
 fef = 0; % forwarding efficiency. data + ctrl packets sent / data packets rcvd
+agt = 0; % total aggregated traffic. data + ctrl pkts tx and relayed / ctrl + data pkts rx
 
 psent = 0;
 prelay = 0;
@@ -28,7 +29,14 @@ end
 fprintf('\r\n--- SIMULATION STATISTICS ---\n');
 for i=1:N         
     if ismember('ODMRP',Protocols)
-        %fprintf('ODMRP protocol statistics, node %d\n', i);        
+        fprintf('ODMRP protocol statistics, node %d ', i);        
+        if Nodes(i).odmrp.isReceiver == 1
+            fprintf('(R)\n');
+        elseif Nodes(i).odmrp.isSender == 1
+            fprintf('(S)\n');                        
+        else
+            fprintf('(N)\n');    
+        end
         %message_cache = Nodes(i).odmrp.message_cache;
         
         data_packets = Nodes(i).odmrp.data.packets;
@@ -52,6 +60,12 @@ for i=1:N
         if data_packets.rcvd > 0
             forw_eff = (data_packets.sent + data_packets.relayed + ctrl_packets.sent + ctrl_packets.relayed) / data_packets.rcvd;
             fef = forw_eff + fef;
+        end
+        
+        % 4. AGT
+        if data_packets.rcvd > 0 || ctrl_packets.rcvd > 0
+            aggr_traffic = (data_packets.sent + data_packets.relayed + ctrl_packets.sent + ctrl_packets.relayed) / (data_packets.rcvd + ctrl_packets.rcvd)
+            agt = aggr_traffic + agt
         end
         
     end
@@ -90,6 +104,7 @@ if ismember('ODMRP',Protocols)
     fprintf('packet delivery ratio: %.2f\n', (pdr / R));
     fprintf('control overhead: %.2f\n', (cov / R));
     fprintf('forwarding efficiency: %.2f\n', (fef / R));
+    fprintf('aggregated traffic: %.2f\n', (agt / R));
 end
 if ismember('NEIGHBOR',Protocols)
     

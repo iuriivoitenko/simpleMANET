@@ -13,9 +13,11 @@ classdef ODMRP < IPv6
         RT_DISCV_TIMEOUT = 30000;
         TTL_VALUE = 32;
         version = 0;
+        overhead = 64;
         msender = [1 0 0];
         mnode = [1 1 0];
         mreceiver = [33 205 163] ./ 255;
+        debug = 1;             % show protocol packets in the debug window
     end        
     
     properties ( Access = private )
@@ -83,6 +85,8 @@ classdef ODMRP < IPv6
             obj.receiver_table = containers.Map;
             obj.member_table = containers.Map;
             obj.member_cache = table;
+            
+            % here we define protocol messages 
             jreq = struct('ver',0,'type','JOIN REQ','reserved',0,'ttl',obj.TTL_VALUE,...
                 'hops',0,'mgroup','A','seq',0,'src',id,'prev',id);
             

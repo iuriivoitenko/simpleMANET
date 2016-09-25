@@ -45,16 +45,16 @@ showalledges = 0;    % show connectivity on the topology
 printstat = 1;       % print detailed statistics after simulation
 
 %% simulation constants ---------------------------------------
-NODES = 10;           % total nodes in simulation
+NODES = 3;           % total nodes in simulation
 SENDERS = 1;          % total senders in simulation
-RECEIVERS = 3;        % total receivers in simulation
+RECEIVERS = 1;        % total receivers in simulation
 
 %% global variables -------------------------------------------
 SIMTIME = 30 * 1000;  % simulation time, ms
 SAMPLING = 10;        % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
-SPEED = 10;           % max speed of movement, m/s
+SPEED = 20;           % max speed of movement, m/s
 RADIO = 800;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
 UP = SIMTIME / 10;    % when nodes wake up, ms
@@ -67,7 +67,7 @@ E = randi([0 100],1,NODES);         % node energy matrix
 Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
 %% Protocols used in this simulation --------------------------
-Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
+Protocols = [{'NEIGHBOR'},{'HLMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
 
 %% Agents used in this simulation -----------------------------
 Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - multicast receiver, 2 - multicast sender
