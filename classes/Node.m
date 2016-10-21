@@ -57,6 +57,8 @@ classdef Node < handle
         waypoint
         rxlisn
         curproto
+        phy
+        mac
         % 1. add custom protocol here
         neighbor
         hlmrp
@@ -69,7 +71,7 @@ classdef Node < handle
     end
     
     methods
-      function obj = Node(id, x, y, simtime, speed, uptime, loss, energy, protocols, agent, apps)
+      function obj = Node(id, x, y, simtime, speed, uptime, loss, energy, phy, mac, protocols, agent, apps)
             obj.id = id;
             obj.color = [.5 .5 .5]; % gray by default
             obj.radius = 50;
@@ -82,6 +84,8 @@ classdef Node < handle
             obj.bytes = struct('sent',0,'rcvd',0);
             obj.energy = energy;
             obj.uptime = uptime; 
+            obj.phy = phy;
+            obj.mac = mac;
             % 2. init protocol here
             p = size(protocols);
             for i=1:p(2)                
@@ -127,6 +131,7 @@ classdef Node < handle
               end
           end
           
+          % protocol timeouts
           % HLMRP protocol timeout function
           if isempty(obj.hlmrp) == 0
               obj.hlmrp = obj.hlmrp.timeout(delay, t);

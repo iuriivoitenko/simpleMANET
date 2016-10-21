@@ -42,22 +42,23 @@ showmoretext = 1;    % show supplementary info of the Node (bottom left to the N
 showlines = 1;       % show line when packet sent 
 showsender = 1;      % show circle around transmitting Node
 showalledges = 0;    % show connectivity on the topology
-printstat = 1;       % print detailed statistics after simulation
+printstat = 1;       % print detavoid
+bypassphyrange = 1;  % avoid real RF range calculation based on PHY params and friis formula
 
 %% simulation constants ---------------------------------------
-NODES = 3;           % total nodes in simulation
+NODES = 10;           % total nodes in simulation
 SENDERS = 1;          % total senders in simulation
-RECEIVERS = 1;        % total receivers in simulation
+RECEIVERS = 5;        % total receivers in simulation
 
 %% global variables -------------------------------------------
 SIMTIME = 30 * 1000;  % simulation time, ms
 SAMPLING = 10;        % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
-SPEED = 20;           % max speed of movement, m/s
+SPEED = 10;           % max speed of movement, m/s
 RADIO = 800;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
-UP = SIMTIME / 10;    % when nodes wake up, ms
+UP = SIMTIME / 20;    % when nodes wake up, ms
 
 %% runtime vars -----------------------------------------------
 P = 0;                              % total packets generated in the simulation
@@ -66,8 +67,24 @@ U = randi([0 UP],1,NODES);          % node start time matrix
 E = randi([0 100],1,NODES);         % node energy matrix
 Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
+%% PHY used in this simulation --------------------------------
+PHY = PhyModel(bypassphyrange, RADIO);
+PHY.freq = 400*10^6;        % carrier frequency, Hz
+PHY.modulation = 'BPSK';    % modulation scheme
+PHY.bitrate = 10^6;         % bitrate, b/s
+PHY.coding = 1/2;           % coding rate
+PHY.Pt = 20;                % Tx power, dBm
+PHY.Pr = -95;               % Rx sensitivity, dBm
+PHY.Gt = 0;                 % Tx antenna gain, dBi
+PHY.Gr = 0;                 % Rx antenna gain, dBi
+PHY.L = 0;                  % other losses, dB
+PHY.Fade = 40;              % fade margin, dB
+
+%% MAC protocol used in this simulation -----------------------
+MAC = macmodel(NODES,'ALOHA');
+
 %% Protocols used in this simulation --------------------------
-Protocols = [{'NEIGHBOR'},{'HLMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
+Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
 
 %% Agents used in this simulation -----------------------------
 Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - multicast receiver, 2 - multicast sender
@@ -75,19 +92,19 @@ Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - multica
 %% Applications used in this simulation -----------------------
 Apps = struct('data','CBR','packetlen',512,'period',100);
 
-%% init nodes and plot topology -------------------------------
+%% init nodes -------------------------------------------------
 for i=1:NODES
-    Nodes(i) = Node(i,Coord(i,1),Coord(i,2),SIMTIME,SPEED,U(i),L(i),E(i),Protocols,Agents(i),Apps);
+    Nodes(i) = Node(i,Coord(i,1),Coord(i,2),SIMTIME,SPEED,U(i),L(i),E(i),PHY,MAC(i),Protocols,Agents(i),Apps);
 end
 
-%% start descrete simulation ----------------------------------
+%% start discrete simulation ----------------------------------
 for t = 1:SAMPLING:SIMTIME
     pause(DELAYPLOT/1000);    
 
     % update topology matrix
-    A = topology(Coord, RADIO, Nodes);    
-                
-    % update plot graph and edges z
+    A = topology(Coord, Nodes); 
+    
+    % update plot graph and edges
     [a,c] = nodecolors(Nodes);    
     scatter(Coord(:,1),Coord(:,2),a,c,'filled');
     

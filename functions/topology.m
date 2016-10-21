@@ -1,4 +1,4 @@
-function [ A ] = topology( coords, limit, nodes )
+function [ A ] = topology( coords, nodes )
 %UNTITLED Summary of this function goes here
 %   function converts coordinates to topology matrix
 
@@ -14,7 +14,7 @@ for i=1:s(1)
             y2 = coords(j,2);
 
             range=sqrt((x2-x1)^2+(y2-y1)^2);
-            if (range)<limit % remove edge and update graph
+            if (range)<nodes(i).phy.range() % remove edge and update graph
                 A(i,j)=1;
             else        
                 A(i,j)=0;
