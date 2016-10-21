@@ -160,8 +160,8 @@ classdef Node < handle
           %
           
           % Process outgoing queue
-          if obj.queue.NumElements() > 0
-              while obj.queue.NumElements() > 0
+          if obj.queue.NumElements > 0
+              while obj.queue.NumElements > 0
                   pkt = obj.queue.remove(); 
                   p = p + 1;
                   obj.packets.sent = obj.packets.sent + 1; 
@@ -201,7 +201,6 @@ classdef Node < handle
                                   case 'JOIN TABLE'
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, count=%d, nonce=%d, group=%s \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.count, pkt.jtable.reserved, pkt.mgroup);                                 
                                   case 'DATA'
-                                        %out = strcat(pkt.type,':',num2str(pkt.dataseq));
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %s, PROTO: %s, type=%s, seq=%d, len=%d, last=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.dataseq, pkt.len, pkt.prev);
                                   otherwise
                                         fprintf('%d. time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', p, t, pkt.src, pkt.dst);

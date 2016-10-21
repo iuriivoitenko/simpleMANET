@@ -18,7 +18,7 @@ classdef Queue < handle
             obj.nextRemove = 1;
         end
         function add( obj, el )
-            if (obj.NumElements() < obj.size)
+            if (obj.NumElements < obj.size)
                 if obj.nextInsert == length( obj.elements )
                     obj.elements = [ obj.elements, cell( 1, length( obj.elements ) ) ];
                 end
@@ -45,7 +45,7 @@ classdef Queue < handle
             tf = ( obj.nextRemove >= obj.nextInsert );
         end
         function n = get.NumElements( obj )
-            n = obj.nextInsert - obj.nextRemove;
+            n = (obj.nextInsert - obj.nextRemove);
         end
         function s = get.size( obj )
             s = obj.size;

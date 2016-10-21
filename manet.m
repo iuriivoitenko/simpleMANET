@@ -33,6 +33,9 @@
 % OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
 %
 %****************************************************************************/
+warning on
+warning off verbose
+warning off backtrace
 
 clear Nodes;
 
