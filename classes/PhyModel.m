@@ -12,7 +12,8 @@ classdef PhyModel < handle
 
     properties (Access = private)
         radio
-        bypass = 0;
+        bypass = 0
+        sending
     end
 
     properties
@@ -26,12 +27,14 @@ classdef PhyModel < handle
         Gr
         L
         Fade
+
     end
     
     methods
         function obj = PhyModel( bypassrange, range )
             obj.radio = range;
             obj.bypass = bypassrange;
+            obj.sending = 0;
         end
             
         % communication range 
@@ -159,6 +162,18 @@ classdef PhyModel < handle
             error('Invalid other losses, dB');
           end
         end
+        
+        function gr = isSending( obj )
+            gr = obj.sending;
+        end
+        
+        function set.sending(obj,s)
+          if (s == 1 || s == 0)
+            obj.sending = s;
+          else
+            error('Invalid transmitting parameter');
+          end
+        end        
         
     end
     

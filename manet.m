@@ -49,32 +49,32 @@ printstat = 1;       % print detavoid
 bypassphyrange = 1;  % avoid real RF range calculation based on PHY params and friis formula
 
 %% simulation constants ---------------------------------------
-NODES = 10;           % total nodes in simulation
+NODES = 3;           % total nodes in simulation
 SENDERS = 1;          % total senders in simulation
-RECEIVERS = 5;        % total receivers in simulation
+RECEIVERS = 2;        % total receivers in simulation
 
 %% global variables -------------------------------------------
 SIMTIME = 30 * 1000;  % simulation time, ms
-SAMPLING = 10;        % network event update, ms
+SAMPLING = 1;        % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
 SPEED = 10;           % max speed of movement, m/s
 RADIO = 800;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
-UP = SIMTIME / 20;    % when nodes wake up, ms
+UP = 0;    % when nodes wake up, ms
 
 %% runtime vars -----------------------------------------------
 P = 0;                              % total packets generated in the simulation
 L = randi([0 LOSS],1,NODES);        % node loss matrix
 U = randi([0 UP],1,NODES);          % node start time matrix
 E = randi([0 100],1,NODES);         % node energy matrix
-Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
+%Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
 %% PHY used in this simulation --------------------------------
 PHY = PhyModel(bypassphyrange, RADIO);
 PHY.freq = 400*10^6;        % carrier frequency, Hz
 PHY.modulation = 'BPSK';    % modulation scheme
-PHY.bitrate = 10^6;         % bitrate, b/s
+PHY.bitrate = 1200;         % bitrate, b/s
 PHY.coding = 1/2;           % coding rate
 PHY.Pt = 20;                % Tx power, dBm
 PHY.Pr = -95;               % Rx sensitivity, dBm
@@ -90,7 +90,7 @@ MAC = macmodel(NODES,'ALOHA');
 Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
 
 %% Agents used in this simulation -----------------------------
-Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - multicast receiver, 2 - multicast sender
+Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - receiver, 2 - sender
 
 %% Applications used in this simulation -----------------------
 Apps = struct('data','CBR','packetlen',512,'period',100);

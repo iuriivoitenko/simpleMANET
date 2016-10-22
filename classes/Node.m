@@ -86,7 +86,7 @@ classdef Node < handle
             obj.uptime = uptime; 
             obj.phy = phy;
             obj.mac = mac;
-            % 2. init protocol here
+            % 2. init protocols here
             p = size(protocols);
             for i=1:p(2)                
                 switch upper(char(protocols(i)))
@@ -123,6 +123,7 @@ classdef Node < handle
               end
           end
           
+          % Protocol timeouts ----------------------------------------
           % Neighbor protocol timeout function
           if isempty(obj.neighbor) == 0 
               obj.neighbor = obj.neighbor.timeout(delay, t);
@@ -130,8 +131,7 @@ classdef Node < handle
                   obj.send_pkt(obj.neighbor);
               end
           end
-          
-          % protocol timeouts
+                   
           % HLMRP protocol timeout function
           if isempty(obj.hlmrp) == 0
               obj.hlmrp = obj.hlmrp.timeout(delay, t);
