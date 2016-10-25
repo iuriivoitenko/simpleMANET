@@ -35,12 +35,14 @@
 %****************************************************************************/
 
 classdef Node < handle
-    %UNTITLED Summary of this class goes here
-    %   Detailed explanation goes here
+    %NODE class
+    %   Represents a single network node in a network
     properties ( Access = private )
+        localtime = 0;
         inited = 0;
         connected = 0;   
         debug = 1;             % show debug text
+        msg
     end
     properties
         id
@@ -50,15 +52,17 @@ classdef Node < handle
         y
         energy
         loss
-        uptime
+        uptime        
         packets
         bytes
         queue
         waypoint
         rxlisn
+        txlisn
+        lklisn
         curproto
         phy
-        mac
+        link
         % 1. add custom protocol here
         neighbor
         hlmrp
@@ -67,7 +71,8 @@ classdef Node < handle
     end
     
     events
-        PacketSent 
+        PacketStart % emitted when packet sending started on tx node
+        PacketSent  % emitted when packet is sent on tx node
     end
     
     methods
@@ -80,12 +85,13 @@ classdef Node < handle
             obj.loss = loss; % loss percent [0...1]
             obj.waypoint = Waypoint(simtime, speed);
             obj.queue = Queue(100); % tx queue
-            obj.packets = struct('sent',0,'rcvd',0,'droped',0,'relayed',0);
+            obj.packets = struct('sent',0,'rcvd',0,'dropped',0,'relayed',0);
             obj.bytes = struct('sent',0,'rcvd',0);
             obj.energy = energy;
             obj.uptime = uptime; 
             obj.phy = phy;
-            obj.mac = mac;
+            obj.link = LinkModel(id,mac);
+            obj.lklisn = addlistener(obj.link,'finishedSending',@obj.sent_pkt); 
             % 2. init protocols here
             p = size(protocols);
             for i=1:p(2)                
@@ -106,16 +112,19 @@ classdef Node < handle
       
       % this function determines whether new packet should be generated or not, called every time simulation is paused
       % packets can be generated either by timeout or fetched from tx queue
-      function [out, p] = generate_pkt(obj, t, delay, p)
+      function [type, p] = generate_pkt(obj, t, delay, p)
           
-          if obj.uptime > t
-              out = '';
+          type = '';
+          obj.localtime = t;
+          if obj.uptime > t              
               return
           elseif obj.inited==0
               obj.color = [33 205 163] ./ 255;
               obj.inited = 1;
-          else
-              obj.waypoint = obj.waypoint.timeout;
+          else 
+              obj.waypoint.timeout;
+              obj.link.timeout(delay);
+              % Colorize nodes 
               if isempty(obj.neighbor) == 0
                   obj.color = obj.neighbor.colorNode;
               elseif isempty(obj.odmrp) == 0
@@ -126,25 +135,25 @@ classdef Node < handle
           % Protocol timeouts ----------------------------------------
           % Neighbor protocol timeout function
           if isempty(obj.neighbor) == 0 
-              obj.neighbor = obj.neighbor.timeout(delay, t);
+              [obj.neighbor, pkt] = obj.neighbor.timeout(delay, t);
               if obj.neighbor.result > 0 % packet generated on timeout   
-                  obj.send_pkt(obj.neighbor);
+                  obj.send_pkt(pkt);
               end
           end
                    
           % HLMRP protocol timeout function
           if isempty(obj.hlmrp) == 0
-              obj.hlmrp = obj.hlmrp.timeout(delay, t);
+              [obj.hlmrp, pkt] = obj.hlmrp.timeout(delay, t);
               if obj.hlmrp.result > 0 % packet generated on timeout              
-                  obj.send_pkt(obj.hlmrp);
+                  obj.send_pkt(pkt);
               end
           end
           
           % ODMRP protocol timeout function
           if isempty(obj.odmrp) == 0
-              obj.odmrp = obj.odmrp.timeout(delay, t);
+              [obj.odmrp, pkt] = obj.odmrp.timeout(delay, t);
               if obj.odmrp.result > 0 % packet generated on timeout              
-                  obj.send_pkt(obj.odmrp);
+                  obj.send_pkt(pkt);
               end    
           end
           
@@ -160,119 +169,139 @@ classdef Node < handle
           %
           
           % Process outgoing queue
-          if obj.queue.NumElements > 0
-              while obj.queue.NumElements > 0
-                  pkt = obj.queue.remove(); 
-                  p = p + 1;
-                  obj.packets.sent = obj.packets.sent + 1; 
-                  obj.bytes.sent = obj.bytes.sent + pkt.len;
-                  out = pkt.type;
-                  notify(obj,'PacketSent');   % we don't have MAC protocol so send packet immediately
-                  % print protocol data
-                  if ~isempty(out)
-                      switch pkt.protoname
-                          case 'NEIGHBOR'
-                              if pkt.debug == 1
-                              switch pkt.type                                  
-                                  case 'HELLO'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.hello.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
-                                  case 'ADVERT'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, out, obj.neighbor.advert.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
-                                  otherwise
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, NEIGHBOR packet unknown\n', p, t, pkt.src, pkt.dst);
-                              end
-                              end
-                          case 'HLMRP'
-                              if pkt.debug == 1
-                              switch pkt.type
-                                  case 'HEARTBEAT'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.nonce, pkt.ttl, pkt.hops);
-                                  case 'DATA'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, out, pkt.hbeat.nonce, pkt.hbeat.ttl, pkt.hbeat.hops);                                  
-                                  otherwise
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, HLMRP packet unknown\n', p, t, pkt.src, pkt.dst);
-                              end
-                              end
-                          case 'ODMRP'
-                              if pkt.debug == 1
-                              switch pkt.type 
-                                  case 'JOIN REQ'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, prev=%d, hops=%d, ttl=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.seq, pkt.prev, pkt.hops, pkt.ttl);
-                                  case 'JOIN TABLE'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, count=%d, nonce=%d, group=%s \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.count, pkt.jtable.reserved, pkt.mgroup);                                 
-                                  case 'DATA'
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %s, PROTO: %s, type=%s, seq=%d, len=%d, last=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, out, pkt.dataseq, pkt.len, pkt.prev);
-                                  otherwise
-                                        fprintf('%d. time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', p, t, pkt.src, pkt.dst);
-                              end
-                              end
-                          % case 'NEWPROTO'
-                          %     fprintf('bla bla bla\n');
-                          otherwise
-                              fprintf('%d. time: %d ms, UNKNOWN PROTOCOL\n', p, t);
-                      end
-                  end                  
-              end
-          else
-              out = '';
-          end          
+          if obj.queue.NumElements > 0 && obj.link.until <= 0 % prevent sending several packets at the same time, so just wait until it's transmitted          
+              pkt = obj.queue.remove();   % fetch IPv6 packet from TX queue         
+              obj.link.lastlen = pkt.len; % put length of this packet into link layer
+              type = pkt.getType;         % get the packet type      
+              p = p + 1;                  % global increment of packets TX
+                  
+              obj.link.linkLockTx(obj.id, obj.phy.duration(pkt.len), pkt); % enable MAC protocol
+              notify(obj,'PacketStart');   % start sending packet immediately
+                  
+              obj.packets.sent = obj.packets.sent + 1; 
+              obj.bytes.sent = obj.bytes.sent + pkt.len;
+
+              % print protocol data
+              if ~isempty(type)
+                  switch pkt.next
+                      case 'NEIGHBOR'
+                          if obj.neighbor.show == 1
+                          switch type                                  
+                              case 'HELLO'
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, type, obj.neighbor.hello.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
+                              case 'ADVERT'
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, type, obj.neighbor.advert.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
+                              otherwise
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, NEIGHBOR packet unknown\n', p, t, pkt.src, pkt.dst);
+                          end
+                          end
+                      case 'HLMRP'
+                          if obj.hlmrp.show == 1
+                          switch type
+                              case 'HEARTBEAT'
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, type, pkt.nonce, pkt.ttl, pkt.hops);
+                              case 'DATA'
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, type, pkt.hbeat.nonce, pkt.hbeat.ttl, pkt.hbeat.hops);                                  
+                              otherwise
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, HLMRP packet unknown\n', p, t, pkt.src, pkt.dst);
+                          end
+                          end
+                      case 'ODMRP'
+                          if obj.odmrp.show == 1
+                          switch type 
+                              case 'JOIN REQ'
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, prev=%d, hops=%d, ttl=%d \n', p, t, pkt.src, pkt.dst, pkt.next, type, pkt.appdata.jreq.seq, pkt.appdata.jreq.prev, pkt.appdata.jreq.hops, pkt.ttl);
+                              case 'JOIN TABLE' 
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, count=%d, nonce=%d, group=%s \n', p, t, pkt.src, pkt.dst, pkt.next, type, pkt.appdata.jtable.count, pkt.appdata.jtable.reserved, pkt.appdata.jtable.mgroup);                                 
+                              case 'DATA'
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %s, PROTO: %s, type=%s, seq=%d, len=%d, last=%d \n', p, t, pkt.src, pkt.dst, pkt.next, type, pkt.appdata.dataseq, pkt.len, pkt.appdata.prev);
+                              otherwise
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', p, t, pkt.src, pkt.dst);
+                           end
+                           end
+                      % case 'NEWPROTO'
+                      %     obj.msg=sprintf('bla bla bla\n');
+                      otherwise
+                           obj.msg=sprintf('%d. time: %d ms, UNKNOWN PROTOCOL\n', p, t);
+                  end
+              end                  
+          end       
       end
       
-      function send_pkt(obj, pkt)              
-          % we put outgoing packet in the tx queue 
-          obj.curproto = pkt.protoname;
-          obj.queue.add(pkt);
+      function send_pkt(obj, pkt)                        
+          obj.queue.add(pkt); % we put outgoing packet in the tx queue 
       end
 
-      function rcvd_pkt(obj,src,~)                             
-          obj.packets.rcvd = obj.packets.rcvd + 1;          
+      function rcvd_pkt(obj,src,~)   
           
-          switch src.curproto
-              case 'NEIGHBOR'
-                  obj.bytes.rcvd = obj.bytes.rcvd + src.neighbor.len;
-                  obj.neighbor = obj.neighbor.process_data(src.neighbor);               
-                  if obj.neighbor.result > 0
-                      obj.send_pkt(obj.neighbor);
-                  elseif obj.neighbor.result < 0
-                      obj.packets.droped = obj.packets.droped + 1;
-                  end
-              case 'HLMRP'
-                  % HLMRP process packet if not NODE
-                  obj.bytes.rcvd = obj.bytes.rcvd + src.hlmrp.len;
-                  
-                  if obj.neighbor.cluster ~= Cluster.NODE
-                      [obj.hlmrp, src.hlmrp] = obj.hlmrp.process_data(src.hlmrp);   
-                      if obj.hlmrp.result > 0
-                          obj.send_pkt(obj.hlmrp);
-                      elseif obj.hlmrp.result <= 0
-                          obj.packets.droped = obj.packets.droped + 1;
+          pkt = src.link.pkt; % extract pkt from link layer of sending node, it's like it was successfully received :)
+
+          %fprintf('rcvd_pkt, %d from %d, pkt.next: %s\r\n', obj.id, src.id, pkt.next);                    
+          obj.link.linkReleaseRx; % at least one node has finished sending            
+          %fprintf('medium at Node %d, busy=%d, err=%d\r',obj.id, obj.link.busy, obj.link.err);
+          
+          if obj.link.isBusy == 0 % if medium was idle, we can receive packet              
+                            
+              % update stats
+              obj.packets.rcvd = obj.packets.rcvd + 1;
+              obj.bytes.rcvd = obj.bytes.rcvd + pkt.len;
+              
+              if ~isempty(pkt.next)
+              switch pkt.next
+                  case 'NEIGHBOR'
+                      [obj.neighbor, pkt] = obj.neighbor.process_data(pkt);               
+                      if obj.neighbor.result > 0
+                          obj.send_pkt(pkt);
+                      elseif obj.neighbor.result < 0
+                          obj.packets.dropped = obj.packets.dropped + 1;
+                      end
+                  case 'HLMRP'
+                      % HLMRP process packet if not NODE
+                      if obj.neighbor.cluster ~= Cluster.NODE
+                          [obj.hlmrp, pkt] = obj.hlmrp.process_data(pkt);   
+                          if obj.hlmrp.result > 0
+                              obj.send_pkt(pkt);
+                          elseif obj.hlmrp.result < 0
+                              obj.packets.dropped = obj.packets.dropped + 1;
+                          end       
+                      end
+                  case 'ODMRP'
+                      % ODMRP process packet                       
+                      [obj.odmrp, pkt] = obj.odmrp.process_data(pkt);   
+                      if obj.odmrp.result > 0
+                          obj.send_pkt(pkt);
+                      elseif obj.odmrp.result < 0
+                          obj.packets.dropped = obj.packets.dropped + 1;
                       end       
-                  end
-              case 'ODMRP'
-                  % ODMRP process packet 
-                  obj.bytes.rcvd = obj.bytes.rcvd + src.odmrp.len;
-                  
-                  [obj.odmrp, src.odmrp] = obj.odmrp.process_data(src.odmrp);   
-                  if obj.odmrp.result > 0
-                      obj.send_pkt(obj.odmrp);
-                  elseif obj.odmrp.result <= 0
-                      obj.packets.droped = obj.packets.droped + 1;
-                  end       
-                           
-              %
-              % Add custom protocol process function
-              %                  
-              otherwise
+
+                  %
+                  % Add custom protocol process function
+                  %                  
+                  otherwise
+              end
+              end
           end
-          
       end
       
+      function start_pkt(obj,src,~)
+          %fprintf('start_pkt, %d -> %d\r\n', src.id, obj.id);
+          obj.link.linkLockRx(src.id);
+      end
+      
+      function sent_pkt(obj,~,~)
+          %fprintf('sent_pkt, %d\r\n', obj.id);
+          obj.link.linkReleaseTx;
+          notify(obj,'PacketSent'); 
+          fprintf(obj.msg); % print out log to command window
+      end
+            
       function obj = connectListener(obj,src) 
           if obj.inited == 0
               return
           end
           if obj.connected == 0
-            obj.rxlisn = addlistener(src,'PacketSent',@obj.rcvd_pkt);          
+            obj.rxlisn = addlistener(src,'PacketSent',@(s,evnt)obj.rcvd_pkt(s,evnt));
+            obj.txlisn = addlistener(src,'PacketStart',@obj.start_pkt);                              
             obj.connected = 1;
           end
       end
@@ -283,6 +312,7 @@ classdef Node < handle
           end
           if obj.connected == 1
             obj.rxlisn.Enabled = true;
+            obj.txlisn.Enabled = true;
           end
       end
       
@@ -292,6 +322,7 @@ classdef Node < handle
           end          
           if obj.connected == 1
             obj.rxlisn.Enabled = false;
+            obj.txlisn.Enabled = false;
           end
       end
       
@@ -301,6 +332,7 @@ classdef Node < handle
           end          
           if obj.connected == 1
             delete(obj.rxlisn);
+            delete(obj.txlisn);
             obj.connected = 0;
           end
       end

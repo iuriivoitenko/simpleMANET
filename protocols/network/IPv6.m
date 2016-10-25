@@ -1,19 +1,35 @@
 classdef IPv6 
     % ProtocolIP Summary of this class goes here
-    % simplified representation of IPv6 protocol
+    % simplified representation of IPv6 protocol and some higher level
+    % fields
     
     properties
-        src
-        dst
-        ttl = 0;
+        ver = 6;
+        tcl = 0;
+        flabel = 0;        
         len = 0;
         next
+        ttl = 0;
+        src
+        dst
         % common transport layer params
         srcport
         dstport
+        % application data
+        appdata
     end
     
-    methods       
+    methods    
+        
+       function type = getType(pkt)
+           if isfield(pkt.appdata,'type') == 1
+               type = pkt.appdata.type;
+           elseif isfield(pkt.appdata,'TYPE') == 1
+               type = pkt.appdata.TYPE;
+           else
+               type = '';
+           end
+       end
        
        function obj = setTtl(obj,ttl)          
           if (isnumeric(ttl))

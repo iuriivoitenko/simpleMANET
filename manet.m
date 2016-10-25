@@ -49,32 +49,32 @@ printstat = 1;       % print detavoid
 bypassphyrange = 1;  % avoid real RF range calculation based on PHY params and friis formula
 
 %% simulation constants ---------------------------------------
-NODES = 3;           % total nodes in simulation
+NODES = 2;           % total nodes in simulation
 SENDERS = 1;          % total senders in simulation
-RECEIVERS = 2;        % total receivers in simulation
+RECEIVERS = 1;        % total receivers in simulation
 
 %% global variables -------------------------------------------
 SIMTIME = 30 * 1000;  % simulation time, ms
 SAMPLING = 1;        % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
-SPEED = 10;           % max speed of movement, m/s
-RADIO = 800;          % range of the radio, m
+SPEED = 1000;           % max speed of movement, m/s
+RADIO = 1500;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
-UP = 0;    % when nodes wake up, ms
+UP = SIMTIME / 1000;    % when nodes wake up, ms
 
 %% runtime vars -----------------------------------------------
 P = 0;                              % total packets generated in the simulation
 L = randi([0 LOSS],1,NODES);        % node loss matrix
 U = randi([0 UP],1,NODES);          % node start time matrix
 E = randi([0 100],1,NODES);         % node energy matrix
-%Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
+Coord = randi([0 SQUARE],NODES,2);  % node initial coordinates
 
 %% PHY used in this simulation --------------------------------
 PHY = PhyModel(bypassphyrange, RADIO);
 PHY.freq = 400*10^6;        % carrier frequency, Hz
 PHY.modulation = 'BPSK';    % modulation scheme
-PHY.bitrate = 1200;         % bitrate, b/s
+PHY.bitrate = 360*10^3;     % bitrate, b/s
 PHY.coding = 1/2;           % coding rate
 PHY.Pt = 20;                % Tx power, dBm
 PHY.Pr = -95;               % Rx sensitivity, dBm
@@ -84,7 +84,7 @@ PHY.L = 0;                  % other losses, dB
 PHY.Fade = 40;              % fade margin, dB
 
 %% MAC protocol used in this simulation -----------------------
-MAC = macmodel(NODES,'ALOHA');
+MAC = macmodel(NODES,'ALOHA'); % in future every node will have own MAC protocol
 
 %% Protocols used in this simulation --------------------------
 Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]

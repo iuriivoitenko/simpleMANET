@@ -84,11 +84,11 @@ classdef HLMRP < IPv6
             obj.dataseq = 0;
             obj.datalen = 0;
             obj.data = struct('packets',struct(),'bytes',struct());
-            obj.data.packets = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
-            obj.data.bytes = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
+            obj.data.packets = struct('sent',0,'rcvd',0,'relayed',0,'dropped',0,'dups',0);
+            obj.data.bytes = struct('sent',0,'rcvd',0,'relayed',0,'dropped',0,'dups',0);
             obj.ctrl = struct('packets',struct(),'bytes',struct());
-            obj.ctrl.packets = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);
-            obj.ctrl.bytes = struct('sent',0,'rcvd',0,'relayed',0,'droped',0,'dups',0);            
+            obj.ctrl.packets = struct('sent',0,'rcvd',0,'relayed',0,'dropped',0,'dups',0);
+            obj.ctrl.bytes = struct('sent',0,'rcvd',0,'relayed',0,'dropped',0,'dups',0);            
             obj.isSender = 0;
             obj.isReceiver = 0;
             obj.groups_tx = [];

@@ -46,9 +46,9 @@ classdef PhyModel < handle
             end            
         end
         
-        % how long a given packet is being transmitted, s
+        % how long a given packet is being transmitted, ms
         function d = duration( obj, packetlen )
-            d = (packetlen * 8 / obj.bitrate) / obj.coding; 
+            d = (packetlen * 8 * 1000 / obj.bitrate) / obj.coding; 
         end
                 
         function s = get.modulation( obj )

@@ -78,8 +78,8 @@ classdef Neighbor < IPv6
             obj.period = 3000;
             obj.timer = 0;
             obj.timestamp = 0;
-            obj.packets = struct('sent',0,'rcvd',0,'droped',0,'dups',0);
-            obj.bytes = struct('sent',0,'rcvd',0,'droped',0,'dups',0);             
+            obj.packets = struct('sent',0,'rcvd',0,'dropped',0,'dups',0);
+            obj.bytes = struct('sent',0,'rcvd',0,'dropped',0,'dups',0);             
             obj.hello = struct('type','HELLO','seq',0,'cluster',0,'peers',0,'metric',0,'ids',[],'peerlist',[]);
             obj.advert = struct('type','ADVERT','seq',0,'cluster',0,'peers',0,'metric',0,'ids',[]);
             obj.metric = id;
@@ -98,11 +98,11 @@ classdef Neighbor < IPv6
             
             proto.result = check_ip(proto.id, pkt); % ip level check
             if (proto.result < 0) 
-                proto.packets.droped = proto.packets.droped + 1; 
-                proto.bytes.droped = proto.bytes.droped + pkt.len;
+                proto.packets.dropped = proto.packets.dropped + 1; 
+                proto.bytes.dropped = proto.bytes.dropped + pkt.len;
             elseif strcmpi(pkt.next, proto.protoname) == 0
-                proto.packets.droped = proto.packets.droped + 1;
-                proto.bytes.droped = proto.bytes.droped + pkt.len;
+                proto.packets.dropped = proto.packets.dropped + 1;
+                proto.bytes.dropped = proto.bytes.dropped + pkt.len;
                 proto.result = -4;
             else % custom protocol check
                                                
@@ -128,8 +128,8 @@ classdef Neighbor < IPv6
                         proto.result = 0;           
                     otherwise
                         % collect stats and discard silently
-                        proto.packets.droped = proto.packets.droped + 1;
-                        proto.bytes.droped = proto.bytes.droped + pkt.len;
+                        proto.packets.dropped = proto.packets.dropped + 1;
+                        proto.bytes.dropped = proto.bytes.dropped + pkt.len;
                         proto.result = 0;
                 end                
             end
