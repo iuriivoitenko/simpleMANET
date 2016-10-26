@@ -271,16 +271,15 @@ classdef ODMRP < IPv6
                 switch (type)
                     case ('JOIN REQ')    
                         [odmrp, pkt] = odmrp.process_join_req(pkt);   
-                        fprintf('node %d processed JREQ, seq=%d, res=%d\n', odmrp.id, pkt.appdata.jreq.seq, odmrp.result);
+                        %fprintf('node %d processed JREQ, seq=%d, res=%d\n', odmrp.id, pkt.appdata.jreq.seq, odmrp.result);
                     case ('JOIN TABLE')
                         [odmrp, pkt] = odmrp.process_join_table(pkt);
-                        fprintf('node %d join_table (%d) processed with res=%d\n', odmrp.id, pkt.appdata.jtable.reserved, odmrp.result);
+                        %fprintf('node %d join_table (%d) processed with res=%d\n', odmrp.id, pkt.appdata.jtable.reserved, odmrp.result);
                     case ('DATA')
                         [odmrp, pkt]  = odmrp.process_mdata(pkt);
-                        fprintf('node %d data processed with res=%d\n', odmrp.id, odmrp.result);
-                    otherwise
-                        % ignore
-                        fprintf('unknown type: %d\n',pkt.type);
+                        %fprintf('node %d data processed with res=%d\n', odmrp.id, odmrp.result);
+                    otherwise % ignore
+                        %fprintf('unknown type: %d\n',pkt.type);
                         odmrp.result = -5;
                 end                
             end
