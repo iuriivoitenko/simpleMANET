@@ -42,7 +42,7 @@ classdef Neighbor < IPv6
         cl_gate_color = [1 1 0];
         cl_lead_color = [33 205 163] ./ 255;
         neighlifetime = 15000; % neighbor valid, ms
-        debug = 1;             % show protocol packets in the debug window
+        show = 1;             % show protocol packets in the debug window
     end
     
     properties ( Access = private )
@@ -51,7 +51,6 @@ classdef Neighbor < IPv6
     end
     
     properties        
-        type
         timer          % current timer tick value
         result
         packets        % protocol packets statistics
@@ -73,10 +72,9 @@ classdef Neighbor < IPv6
         
         function obj = Neighbor(id)
             obj.id = id;
-            obj.type;
             obj.protoname = 'NEIGHBOR';
-            obj.period = 3000;
-            obj.timer = 0;
+            obj.period = 300;
+            obj.timer = obj.period;
             obj.timestamp = 0;
             obj.packets = struct('sent',0,'rcvd',0,'dropped',0,'dups',0);
             obj.bytes = struct('sent',0,'rcvd',0,'dropped',0,'dups',0);             
@@ -94,187 +92,181 @@ classdef Neighbor < IPv6
             obj.result = 0;
         end
         
-        function proto = process_data(proto,pkt)
+        function [proto, pkt] = process_data(proto, pkt)
             
             proto.result = check_ip(proto.id, pkt); % ip level check
             if (proto.result < 0) 
-                proto.packets.dropped = proto.packets.dropped + 1; 
-                proto.bytes.dropped = proto.bytes.dropped + pkt.len;
+                
             elseif strcmpi(pkt.next, proto.protoname) == 0
-                proto.packets.dropped = proto.packets.dropped + 1;
-                proto.bytes.dropped = proto.bytes.dropped + pkt.len;
                 proto.result = -4;
             else % custom protocol check
                                                
                 pkt.ttl = pkt.ttl - 1;
                 
-                switch (pkt.type)
-                    case ('HELLO')                        
-                        % reply with ADVRT, if not known 
-                        proto = proto.processHello(pkt.src, pkt.len, pkt.hello);
-                        if  proto.result > 0
-                            proto = proto.advertise(pkt);   
-                        end
-                        
-                    case ('ADVERT')   
-                        % collect neighbors and update rtable, if seq                        
-                        if proto.hello.seq == pkt.advert.seq                             
-                            proto = proto.processAdvert(pkt.src, pkt.len, pkt.advert); 
-                        else
-                            proto.packets.dups = proto.packets.dups + 1;
-                            proto.bytes.dups = proto.bytes.dups + pkt.len;
-                        end
-                        
-                        proto.result = 0;           
+                type = pkt.getType;
+                
+                switch (type)
+                    case ('HELLO') % reply with ADVRT, if not known                         
+                        [proto, pkt] = proto.process_hello(pkt); 
+                        %fprintf('node %d HELLO processed with res=%d\n', proto.id, proto.result);
+                    case ('ADVERT') % collect neighbors and update rtable, if seq                        
+                        [proto, pkt] = proto.process_advert(pkt);                         
+                        %fprintf('node %d ADVERT processed with res=%d\n', proto.id, proto.result);
                     otherwise
-                        % collect stats and discard silently
-                        proto.packets.dropped = proto.packets.dropped + 1;
-                        proto.bytes.dropped = proto.bytes.dropped + pkt.len;
-                        proto.result = 0;
+                        proto.result = -5;
+                        %fprintf('node %d unknown packet type=%d processed with res=%d\n', proto.id, type, proto.result);
                 end                
             end
         end
         
-        function obj = timeout(obj,d,t)
+        function [obj, pkt] = timeout(obj,d,t)
+            pkt = [];
             obj.timestamp = t; % remember local time
             obj.timer = obj.timer + d;
             if (obj.timer >= obj.period)
-                obj = obj.send_hello();
                 obj.timer = mod(obj.period, d);
-                %obj.period = obj.period + (obj.peers * 3000); 
-                obj.result = obj.len;
+                [obj, pkt] = obj.send_hello;                
+                %obj.period = obj.period + (obj.peers * 3000);                 
+                obj.result = pkt.len;
             else
                 obj.result = 0;
             end            
         end
         
-        function obj = send_hello(obj)                        
+        function [obj, pkt] = send_hello(obj)                        
             
-            obj = obj.clusterUpdate();
+            obj = obj.clusterUpdate;
             
-            % IP level
-            obj.src = obj.id;
-            obj.dst = 0; % 0 - broadcast
-            obj.ttl = 1;
-            obj.len = 80;
-            obj.next = obj.protoname;
+            % create and fill out IPv6 packet class instance
+            pkt = IPv6;             
+            pkt.src = obj.id;
+            pkt.dst = 0;
+            pkt.ttl = 1;
+            pkt.next = obj.protoname;
+            pkt.len = 80;              
             
             % custom proto level
             % fill HELLO packet struct
-            % Normally this is what we send out to the network            
-            obj.type = 'HELLO';
-            obj.peers = obj.rtable.neighbors();
-            obj.hello.seq = obj.hello.seq + 1; % unique nonce
-            obj.hello.cluster = obj.cluster;
-            obj.hello.peers = obj.rtable.neighbors();
-            obj.hello.metric = obj.metric;
-            obj.hello.ids = obj.ids;
-            obj.hello.peerlist = obj.peerlist.keys;
+            % Normally this is what we send out to the network                   
+            pkt.appdata = obj.hello;
+            obj.hello.seq = obj.hello.seq + 1;
+            pkt.appdata.seq = obj.hello.seq; % unique nonce
+            pkt.appdata.cluster = obj.cluster;
+            pkt.appdata.peers = obj.rtable.neighbors;
+            pkt.appdata.metric = obj.metric;
+            pkt.appdata.ids = obj.ids;
+            pkt.appdata.peerlist = obj.peerlist.keys;
             
             % update stats
             obj.packets.sent = obj.packets.sent + 1;
             obj.bytes.sent = obj.bytes.sent + obj.len; 
         end
         
-        function obj = processHello(obj, src, len, hello)
-            if ismember(num2str(obj.id), hello.peerlist) == 0
-                obj.result = 1;
+        function [obj, pktout] = send_advertise(obj, pkt)
+            
+            %obj = obj.clusterUpdate();
+            pktout = pkt;
+            
+            % create and fill out IPv6 packet class instance            
+            pktout.src = obj.id;
+            pktout.dst = pkt.src;            
+            pktout.ttl = 1;
+            pktout.next = obj.protoname;
+            pktout.len = 80 + (numel(pkt.appdata.ids) * 2) + (pkt.appdata.peers * 6);
+          
+            % custom proto level                        
+            obj.metric = obj.calcMetric;
+            pktout.appdata = obj.advert;
+            pktout.appdata.seq = pkt.appdata.seq;
+            pktout.appdata.metric = obj.metric;
+            pktout.appdata.cluster = obj.cluster;
+            pktout.appdata.peers = obj.rtable.neighbors;
+            pktout.appdata.ids = obj.ids;
+            obj.result = pkt.len;
+            
+            % update stats
+            obj.packets.sent = obj.packets.sent + 1;
+            obj.bytes.sent = obj.bytes.sent + obj.len; 
+        end         
+        
+        function [obj, pkt] = process_hello(obj, pkt)
+            
+            if ismember(num2str(obj.id), pkt.appdata.peerlist) == 0
+                [obj, pkt] = obj.send_advertise(pkt);
             else
                 %fprintf('%d prolonging peer %s \n', (obj.id), num2str(src));
-                if obj.peerlist.isKey(num2str(src))
-                    peer = obj.peerlist(num2str(src));
+                if obj.peerlist.isKey(num2str(pkt.src))
+                    peer = obj.peerlist(num2str(pkt.src));
                     peer.expire = obj.timestamp + obj.neighlifetime;
-                    peer.cluster = hello.cluster;
-                    peer.metric = hello.metric;
-                    peer.peers = hello.peers;
-                    peer.ids = hello.ids;
-                    obj.peerlist(num2str(src)) = peer;
+                    peer.cluster = pkt.appdata.cluster;
+                    peer.metric = pkt.appdata.metric;
+                    peer.peers = pkt.appdata.peers;
+                    peer.ids = pkt.appdata.ids;
+                    obj.peerlist(num2str(pkt.src)) = peer;
                     %fprintf('prolonged till %d\n', peer.expire);
                     
-                    if obj.rtable.contains(src,1) == 1
-                        switch hello.cluster
+                    if obj.rtable.contains(pkt.src,1) == 1
+                        switch pkt.appdata.cluster
                             case Cluster.LEADER
                                 flags = 'L';
                             case Cluster.GATEWAY
                                 flags = 'G';
                             case Cluster.NODE
                                 flags = 'N';
-                            otherwise                  
+                            otherwise  
+                                obj.result = -7;
+                                return;
                         end                        
                         %fprintf('%d rtable hello update %s, M=%d, F=%s\n', (obj.id), num2str(src), hello.metric, flags);
-                        obj.rtable.updateMetric(src, hello.metric);
-                        obj.rtable.updateFlags(src, flags);
+                        obj.rtable.updateMetric(pkt.src, pkt.appdata.metric);
+                        obj.rtable.updateFlags(pkt.src, flags);
                         %obj.rtable.show                        
                     end                    
-                end                
+                end                            
                 obj.result = 0;
             end
             
             %obj = obj.clusterUpdate();
             
             obj.packets.rcvd = obj.packets.rcvd + 1;
-            obj.bytes.rcvd = obj.bytes.rcvd + len;            
+            obj.bytes.rcvd = obj.bytes.rcvd + pkt.len;            
         end
-        
-        function obj = advertise(obj,pkt)
+                 
+        function [obj, pkt] = process_advert(obj, pkt)
             
-            %obj = obj.clusterUpdate();
-            
-            % IP level
-            obj.src = obj.id;
-            obj.dst = pkt.src;             
-            obj.ttl = 1;
-            obj.len = 80 + (numel(obj.ids) * 2) + (obj.peers * 6);
-          
-            % custom proto level
-            obj.type = 'ADVERT';
-            obj.peers = obj.rtable.neighbors();
-            obj.metric = obj.calcMetric();
-            obj.advert.seq = pkt.hello.seq;
-            obj.advert.metric = obj.metric;
-            obj.advert.cluster = obj.cluster;
-            obj.advert.peers = obj.rtable.neighbors();
-            obj.advert.ids = obj.ids;
-            obj.result = obj.len;
-            
-            % update stats
-            obj.packets.sent = obj.packets.sent + 1;
-            obj.bytes.sent = obj.bytes.sent + obj.len; 
-        end   
-        
-        function obj = processAdvert(obj,src,len,advert)
-            
-            peer = struct('id',src,'metric',advert.metric,'cluster',advert.cluster,...
-                'expire',0,'peers',advert.peers,'ids',advert.ids);
+            peer = struct('id',pkt.src,'metric',pkt.appdata.metric,'cluster',pkt.appdata.cluster,...
+                'expire',0,'peers',pkt.appdata.peers,'ids',pkt.appdata.ids);
             peer.expire = obj.timestamp + obj.neighlifetime;
-            obj.peerlist(num2str(src)) = peer;
+            obj.peerlist(num2str(pkt.src)) = peer;
                        
-            switch advert.cluster
+            switch pkt.appdata.cluster
                 case Cluster.LEADER
                     flags = 'L';
                 case Cluster.GATEWAY
                     flags = 'G';
                 case Cluster.NODE
                     flags = 'N';
-                otherwise                  
+                otherwise 
+                    obj.result = -8;
+                    return;
             end            
             
-            if obj.rtable.contains(src,1) == 0
+            if obj.rtable.contains(pkt.src,1) == 0
                 %fprintf('%d rtable insert %s\n', (obj.id), num2str(src));
-                obj.rtable.add(src,src,1,advert.metric,flags);
+                obj.rtable.add(pkt.src,pkt.src,1,pkt.appdata.metric,flags);
                 %obj.rtable.show
             else
                 %fprintf('%d rtable update %s, M=%d, F=%s\n', (obj.id), num2str(src), advert.metric, flags);
-                obj.rtable.updateMetric(src, advert.metric);
-                obj.rtable.updateFlags(src, flags);
+                obj.rtable.updateMetric(pkt.src, pkt.appdata.metric);
+                obj.rtable.updateFlags(pkt.src, flags);
                 %obj.rtable.show
-
             end
                 
-            obj = obj.clusterUpdate();
+            obj = obj.clusterUpdate;
             
             obj.packets.rcvd = obj.packets.rcvd + 1;
-            obj.bytes.rcvd = obj.bytes.rcvd + len;            
+            obj.bytes.rcvd = obj.bytes.rcvd + pkt.len;  
+            obj.result = 0;
         end
         
         function obj = removeExpiredPeers(obj)

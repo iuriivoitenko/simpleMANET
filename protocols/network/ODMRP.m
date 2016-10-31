@@ -17,30 +17,26 @@ classdef ODMRP < IPv6
         msender = [1 0 0];
         mnode = [1 1 0];
         mreceiver = [33 205 163] ./ 255;
-        show = 1;             % show protocol packets in the debug window
     end        
+    
+    properties (Constant)
+        show = 1;             % show protocol packets in the debug window
+    end     
     
     properties ( Access = private )
         id
     end
     
     properties
-%         type  
-%         seq 
-%         prev
         protoname
         timestamp
         timer
         fgtimer
-        %dataseq
         dataperiod
         datatimer
         isSender
         isReceiver
-        datalen
-        %hops
-        %count
-        %mgroup                       
+        datalen                   
         result
         data
         ctrl

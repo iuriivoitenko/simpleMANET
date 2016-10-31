@@ -47,11 +47,12 @@ showsender = 1;      % show circle around transmitting Node
 showalledges = 0;    % show connectivity on the topology
 printstat = 1;       % print detavoid
 bypassphyrange = 1;  % avoid real RF range calculation based on PHY params and friis formula
+enablemac = 0;       % enable MAC protocol, if=0 all packets deliver sucessfully
 
 %% simulation constants ---------------------------------------
-NODES = 5;           % total nodes in simulation
+NODES = 3;           % total nodes in simulation
 SENDERS = 1;          % total senders in simulation
-RECEIVERS = 2;        % total receivers in simulation
+RECEIVERS = 1;        % total receivers in simulation
 
 %% global variables -------------------------------------------
 SIMTIME = 30 * 1000;  % simulation time, ms
@@ -59,9 +60,9 @@ SAMPLING = 1;         % network event update, ms
 DELAYPLOT = 10;       % delay in plot update, ms
 SQUARE = 2000;        % square area, m
 SPEED = 10;           % max speed of movement, m/s
-RADIO = 500;          % range of the radio, m
+RADIO = 2000;          % range of the radio, m
 LOSS = 0;             % loss percent per link, %
-UP = SIMTIME / 10;    % when nodes wake up, ms
+UP = SIMTIME / 100;    % when nodes wake up, ms
 
 %% runtime vars -----------------------------------------------
 P = 0;                              % total packets generated in the simulation
@@ -84,10 +85,10 @@ PHY.L = 0;                  % other losses, dB
 PHY.Fade = 40;              % fade margin, dB
 
 %% MAC protocol used in this simulation -----------------------
-MAC = macmodel(NODES,'ALOHA'); % in future every node will have own MAC protocol
+MAC = macmodel(enablemac, NODES, 'ALOHA'); % in future every node will have own MAC protocol
 
 %% Protocols used in this simulation --------------------------
-Protocols = [{'ODMRP'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
+Protocols = [{'neighbor'},{'hlmrp'}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
 
 %% Agents used in this simulation -----------------------------
 Agents = agentrole(NODES,SENDERS,RECEIVERS);  % 0 - no data traffic, 1 - receiver, 2 - sender

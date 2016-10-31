@@ -39,26 +39,23 @@ classdef HLMRP < IPv6
     % HLMRP: hop limited multicast routing protocol
     % this class represents the protocol logic
     properties (Constant)
-        debug = 1;             % show protocol packets in the debug window
+        show = 1;             % show protocol packets in the debug window
     end 
     
     properties ( Access = private )
         id      
         period                 % timeout interval, ms  
         maxhops = 8;
+        overhead = 48;
     end
     
     properties
-        type
-        nonce
-        last
-        hops
         protoname
         timer          % current timer tick value
-        hbeat
+        hbeat        
+        mdata
         data
         ctrl
-        dataseq
         datalen
         dataperiod
         datatimer
@@ -77,11 +74,10 @@ classdef HLMRP < IPv6
         function obj = HLMRP(id, agent, app)
             obj.id = id;
             obj.protoname = 'HLMRP';
-            obj.period = 1980;
+            obj.period = 180;
             obj.timer = 0;
             obj.dataperiod = 0;
             obj.datatimer = 0;
-            obj.dataseq = 0;
             obj.datalen = 0;
             obj.data = struct('packets',struct(),'bytes',struct());
             obj.data.packets = struct('sent',0,'rcvd',0,'relayed',0,'dropped',0,'dups',0);
@@ -104,6 +100,7 @@ classdef HLMRP < IPv6
             obj.hbeat = struct('ver',2,'type','HEARTBEAT','hops',obj.maxhops,'ttl',obj.maxhops,...
                 'groups',0,'nonce',0,'last',id,'mgroups',[]);
             
+            obj.mdata = struct('ver',2,'type','DATA','payload','');
             
             % 'A' is a multicast group id
             if agent == 1
@@ -137,7 +134,8 @@ classdef HLMRP < IPv6
             obj.isReceiver = 1;
         end   
         
-        function obj = join_group_rxtx(obj, gr)
+        function obj = join_group_rxtx(obj, gr, datalen)
+            obj.datalen = datalen;
             obj.groups_tx = [obj.groups_tx gr];
             obj.groups_rx = [obj.groups_rx gr];
             obj.isSender = 1;
@@ -148,103 +146,121 @@ classdef HLMRP < IPv6
             
             hlmrp.result = check_ip(hlmrp.id,pkt); % ip level check
             if (hlmrp.result < 0) 
-
+                return;
             elseif strcmpi(pkt.next, hlmrp.protoname) == 0
                 hlmrp.result = -4;
-            elseif strcmpi(num2str(hlmrp.id), num2str(pkt.last)) == 1
-                hlmrp.result = -5;
-            elseif hlmrp.hops > hlmrp.maxhops
-                hlmrp.result = -6;
             else % custom protocol check
-                                               
+                                  
+                if isfield(pkt.appdata,'last') == 1 
+                    if strcmpi(num2str(hlmrp.id), num2str(pkt.appdata.last)) == 1
+                        hlmrp.result = -5;
+                        return;
+                    elseif pkt.appdata.hops > hlmrp.maxhops
+                        hlmrp.result = -6;
+                        return;
+                    end
+                end
+                
                 pkt.ttl = pkt.ttl - 1;
                 
-                switch (pkt.type)
+                type = pkt.getType;
+                
+                switch (type)
                     case ('HEARTBEAT')                        
-                        hlmrp = hlmrp.process_heartbeat(pkt);                        
+                        [hlmrp, pkt] = hlmrp.process_heartbeat(pkt);                        
                     case ('DATA')
-                        hlmrp = hlmrp.process_mdata(pkt);
-                    otherwise
-                        % ignore
-                        hlmrp.result = 0;
+                        [hlmrp, pkt] = hlmrp.process_mdata(pkt);
+                    otherwise % ignore
+                        hlmrp.result = -7;
                 end                
             end
         end
         
-        function obj = timeout(obj,d,t)
+        function [obj, pkt] = timeout(obj,d,t)
+            pkt = [];
             obj.timestamp = t; % remember local time
             obj.timer = obj.timer + d;
             obj.datatimer = obj.datatimer + d;
             
             if (obj.datatimer >= obj.dataperiod && obj.isSender == 1) % data timer, if sender
-                obj.datatimer = mod(obj.datatimer, d);
                 %fprintf('sending HLMRP DATA\r\n');
-                %obj.send_mdata(obj.groups_tx(1));
-                obj.result = 0; % obj.len;
+                obj.datatimer = mod(obj.datatimer, d);                
+                [obj, pkt] = obj.send_mdata(obj.groups_tx(1));
+                obj.result = pkt.len;
             elseif (obj.timer >= obj.period) % heartbeat timer
-                obj = obj.send_heartbeat(obj.id);
-                obj.timer = mod(obj.period, d);
                 %obj.period = obj.period + (obj.peers * 3000); 
-                obj.result = obj.len;
+                obj.timer = mod(obj.period, d);                
+                [obj, pkt] = obj.send_heartbeat(obj.id);                                
+                obj.result = pkt.len;
             else
                 obj.result = 0;
             end                                     
         end
         
-        function obj = send_heartbeat(obj, id)
-            % IP level
-            obj.src = id;
-            obj.dst = 0;
-            obj.ttl = 8;
-            obj.next = 'HLMRP';
+        function [hlmrp, pkt] = send_heartbeat(hlmrp, id)
+            % create and fill out IPv6 packet class instance
+            pkt = IPv6;             
+            pkt.src = hlmrp.id;
+            pkt.dst = 0;
+            pkt.ttl = hlmrp.maxhops;
+            pkt.next = hlmrp.protoname;
+            pkt.len = 40 + hlmrp.overhead + (16 * hlmrp.hbeat.groups);
             % HLMRP level
-            obj.hbeat.groups = numel(obj.groups_rx);
-            obj.hbeat.nonce = randi([0 1000000],1,1);
-            obj.hbeat.ttl = obj.maxhops;
-            obj.hbeat.last = id;
-            obj.hbeat.mgroups = obj.groups_rx;
-            
-            % update visualization params
-            obj.type = 'HEARTBEAT';     
-            obj.nonce = obj.hbeat.nonce;
-            obj.hops = obj.hbeat.hops;
-            obj.last = obj.id;
-            obj.len = 32 + (16 * obj.hbeat.groups);
+            pkt.appdata = hlmrp.hbeat;
+            pkt.appdata.groups = numel(hlmrp.groups_rx);
+            pkt.appdata.nonce = randi([0 1000000],1,1);
+            pkt.appdata.ttl = hlmrp.maxhops;
+            pkt.appdata.hops = hlmrp.maxhops;
+            pkt.appdata.last = id;
+            pkt.appdata.mgroups = hlmrp.groups_rx;           
             
             % collect stats
-            obj.data.packets.sent = obj.data.packets.sent + 1;
-            obj.data.bytes.sent = obj.data.bytes.sent + obj.len;  
+            hlmrp.data.packets.sent = hlmrp.data.packets.sent + 1;
+            hlmrp.data.bytes.sent = hlmrp.data.bytes.sent + hlmrp.len;  
             
             % remember own nonce to avoid rebroadcast
-            obj.nonces(num2str(obj.hbeat.nonce)) = obj.timestamp + 1000;
+            hlmrp.nonces(num2str(pkt.appdata.nonce)) = hlmrp.timestamp + 1000;
         end
         
-        function hlmrp = process_heartbeat(hlmrp, pkt)
+        function [hlmrp, pkt] = send_mdata(hlmrp, gr) 
+            % create and fill out IPv6 packet class instance
+            pkt = IPv6;             
+            pkt.src = hlmrp.id;
+            pkt.dst = gr;
+            pkt.ttl = hlmrp.maxhops;
+            pkt.next = hlmrp.protoname;
+            pkt.len = 40 + hlmrp.overhead + hlmrp.datalen;            
+            % HLMRP level
+            pkt.appdata = hlmrp.mdata;
+            pkt.appdata.type = 'DATA';            
             
-            if pkt.hbeat.ttl <= 0
-                pkt.result = 0;
-            elseif hlmrp.nonces.isKey(num2str(pkt.hbeat.nonce)) == 0 % not known packet, forward it
-                hlmrp.nonces(num2str(pkt.hbeat.nonce)) = hlmrp.timestamp + 1000;
-                pkt.hbeat.last = hlmrp.id;
-                pkt.hbeat.ttl = pkt.hbeat.ttl - 1; % HLMRP level TTL               
-
-                hlmrp.hbeat = pkt.hbeat;
-                hlmrp.src = pkt.src;
-                hlmrp.dst = pkt.dst;
-                hlmrp.ttl = pkt.ttl; % IP level TTL
-                hlmrp.type = pkt.hbeat.type;
-                hlmrp.nonce = pkt.hbeat.nonce;
-                hlmrp.last = pkt.hbeat.last;
-                hlmrp.hops = pkt.hbeat.hops;
-                
+            % update stats
+            hlmrp.data.packets.sent = hlmrp.data.packets.sent + 1;
+            hlmrp.data.bytes.sent = hlmrp.data.bytes.sent + hlmrp.len;            
+        end 
+        
+        function [hlmrp, pkt] = process_heartbeat(hlmrp, pkt)
+            
+            if pkt.appdata.ttl <= 0
+                hlmrp.result = -8;
+            elseif hlmrp.nonces.isKey(num2str(pkt.appdata.nonce)) == 0 % not known packet, forward it
+                hlmrp.nonces(num2str(pkt.appdata.nonce)) = hlmrp.timestamp + 1000;
+                pkt.appdata.last = hlmrp.id;
+                pkt.appdata.ttl = pkt.appdata.ttl - 1; % HLMRP level TTL                              
                 hlmrp.result = pkt.len;
                 % collect stats
                 hlmrp.ctrl.packets.relayed = hlmrp.ctrl.packets.relayed + 1;
                 hlmrp.ctrl.bytes.relayed = hlmrp.ctrl.bytes.relayed + pkt.len;
             else
-                pkt.result = 0;
+                hlmrp.result = 0;
+                hlmrp.ctrl.packets.dups = hlmrp.ctrl.packets.dups + 1;
+                hlmrp.ctrl.bytes.dups = hlmrp.ctrl.bytes.dups + pkt.len;
             end
-            hlmrp.removeNonces();
+            hlmrp.removeNonces;
+        end
+        
+        function [hlmrp, pkt] = process_mdata(hlmrp, pkt)
+            hlmrp.result = 0;
         end
         
         function obj = removeNonces(obj)
@@ -260,25 +276,6 @@ classdef HLMRP < IPv6
             end             
         end
         
-        function obj = send_mdata(obj, gr)                     
-            % IP level
-            obj.src = obj.id;
-            obj.dst = gr;
-            obj.ttl = obj.maxhops;
-            obj.next = obj.protoname;
-            obj.len = 40 + obj.datalen;
-            % ODMRP level
-            obj.type = 'DATA';
-            obj.dataseq = obj.data.packets.sent + 1;
-            
-            % update visualization params
-            obj.mgroup = 'A';
-            %obj.prev = obj.id;
-            
-            % update stats
-            obj.data.packets.sent = obj.data.packets.sent + 1;
-            obj.data.bytes.sent = obj.data.bytes.sent + obj.len;            
-        end 
     end
 end
 

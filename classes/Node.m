@@ -86,11 +86,11 @@ classdef Node < handle
             obj.waypoint = Waypoint(simtime, speed);
             obj.queue = Queue(100); % tx queue
             obj.packets = struct('sent',0,'rcvd',0,'dropped',0,'relayed',0);
-            obj.bytes = struct('sent',0,'rcvd',0);
+            obj.bytes = struct('sent',0,'rcvd',0,'dropped',0,'relayed',0);
             obj.energy = energy;
             obj.uptime = uptime; 
             obj.phy = phy;
-            obj.link = LinkModel(id,mac);
+            obj.link = LinkModel(id,mac.proto,mac.enabled);
             obj.lklisn = addlistener(obj.link,'finishedSending',@obj.sent_pkt); 
             % 2. init protocols here
             p = size(protocols);
@@ -188,9 +188,9 @@ classdef Node < handle
                           if obj.neighbor.show == 1
                           switch type                                  
                               case 'HELLO'
-                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, type, obj.neighbor.hello.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, pkt.src, pkt.dst, pkt.next, type, pkt.appdata.seq, char(pkt.appdata.cluster), pkt.appdata.metric, pkt.appdata.peers);
                               case 'ADVERT'
-                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, obj.neighbor.src, obj.neighbor.dst, obj.neighbor.protoname, type, obj.neighbor.advert.seq, char(obj.neighbor.cluster), obj.neighbor.metric, obj.neighbor.peers);
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s, seq=%d, cluster=%s, M=%d, P=%d \n', p, t, pkt.src, pkt.dst, pkt.next, type, pkt.appdata.seq, char(pkt.appdata.cluster), pkt.appdata.metric, pkt.appdata.peers);
                               otherwise
                                     obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, NEIGHBOR packet unknown\n', p, t, pkt.src, pkt.dst);
                           end
@@ -199,9 +199,9 @@ classdef Node < handle
                           if obj.hlmrp.show == 1
                           switch type
                               case 'HEARTBEAT'
-                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, type, pkt.nonce, pkt.ttl, pkt.hops);
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.next, pkt.appdata.last, type, pkt.appdata.nonce, pkt.appdata.ttl, pkt.appdata.hops);
                               case 'DATA'
-                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, LAST: %d, type=%s, nonce=%d, ttl=%d, hops=%d \n', p, t, pkt.src, pkt.dst, pkt.protoname, pkt.last, type, pkt.hbeat.nonce, pkt.hbeat.ttl, pkt.hbeat.hops);                                  
+                                    obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, PROTO: %s, type=%s \n', p, t, pkt.src, pkt.dst, pkt.next, type);
                               otherwise
                                     obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, HLMRP packet unknown\n', p, t, pkt.src, pkt.dst);
                           end
@@ -254,6 +254,7 @@ classdef Node < handle
                           obj.send_pkt(pkt);
                       elseif obj.neighbor.result < 0
                           obj.packets.dropped = obj.packets.dropped + 1;
+                          obj.bytes.dropped = obj.bytes.dropped + pkt.len;
                       end
                   case 'HLMRP'
                       % HLMRP process packet if not NODE
@@ -263,6 +264,7 @@ classdef Node < handle
                               obj.send_pkt(pkt);
                           elseif obj.hlmrp.result < 0
                               obj.packets.dropped = obj.packets.dropped + 1;
+                              obj.bytes.dropped = obj.bytes.dropped + pkt.len;
                           end       
                       end
                   case 'ODMRP'
@@ -272,6 +274,7 @@ classdef Node < handle
                           obj.send_pkt(pkt);
                       elseif obj.odmrp.result < 0
                           obj.packets.dropped = obj.packets.dropped + 1;
+                          obj.bytes.dropped = obj.bytes.dropped + pkt.len;
                       end       
 
                   %

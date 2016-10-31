@@ -9,6 +9,7 @@ classdef LinkModel < handle
         busy
         until
         lastlen
+        enabled
         src
         collisions = 0;
         carrier = 0;
@@ -21,7 +22,7 @@ classdef LinkModel < handle
     end
     
     methods
-        function obj = LinkModel( id, proto )
+        function obj = LinkModel( id, proto, ena )
                                       
             switch upper(char(proto))
                 case 'ALOHA'
@@ -42,6 +43,7 @@ classdef LinkModel < handle
             obj.busy = 0;
             obj.until = 0;
             obj.lastlen = 0;
+            obj.enabled = ena;
             obj.collisions = 0;
             obj.err = 0;
             obj.src = '';
@@ -54,6 +56,12 @@ classdef LinkModel < handle
         end
         
         function b = isBusy( obj )
+            
+            if obj.enabled == 0
+                b = 0;
+                return;
+            end
+            
             if (obj.err == 1)
                 b = 1;
             elseif obj.busy > 0 && obj.err == 0 
@@ -69,7 +77,9 @@ classdef LinkModel < handle
         
         function obj = linkLockTx(obj,src,time,pkt)
             if (isnumeric(time))
-                obj.busy = obj.busy + 1;
+                if obj.enabled == 1
+                    obj.busy = obj.busy + 1;
+                end
                 obj.src = src;               
                 obj.until = time;
                 obj.pkt = pkt;
@@ -81,7 +91,9 @@ classdef LinkModel < handle
         
         function obj = linkLockRx(obj,src)
             obj.carrier = obj.carrier + 1;
-            obj.busy = obj.busy + 1;
+            if obj.enabled == 1
+                obj.busy = obj.busy + 1;
+            end
             obj.src = src;    
             if obj.busy > 1
                 %fprintf('%d senses carrier on link from %d with collision\r\n',obj.id, src); 

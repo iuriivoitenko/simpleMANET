@@ -1,5 +1,5 @@
 TODO: 
 throughput graph
 loss model
-link model
 google maps layer under topology
+remaining energy calculation
