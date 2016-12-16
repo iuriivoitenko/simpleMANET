@@ -18,7 +18,7 @@ N = numel(Nodes);
 for i=1:N
     psent = psent + Nodes(i).packets.sent;
     prcvd = prcvd + Nodes(i).packets.rcvd;
-    pdrop = pdrop + Nodes(i).packets.droped;
+    pdrop = pdrop + Nodes(i).packets.dropped;
     bsent = bsent + Nodes(i).bytes.sent;
     brcvd = brcvd + Nodes(i).bytes.rcvd;
     if ismember('ODMRP',Protocols)

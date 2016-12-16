@@ -50,8 +50,8 @@ bypassphyrange = 1;  % avoid real RF range calculation based on PHY params and f
 enablemac = 0;       % enable MAC protocol, if=0 all packets deliver sucessfully
 
 %% simulation constants ---------------------------------------
-NODES = 3;           % total nodes in simulation
-SENDERS = 1;          % total senders in simulation
+NODES = 10;           % total nodes in simulation
+SENDERS = 5;          % total senders in simulation
 RECEIVERS = 1;        % total receivers in simulation
 
 %% global variables -------------------------------------------
