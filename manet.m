@@ -62,7 +62,7 @@ PHY = PhyModel(ini.globals.RADIO, ini.phy);
 MAC = macmodel(ini.constants.NODES, ini.mac); % in future every node will have own MAC protocol
 
 %% Protocols used in this simulation --------------------------
-Protocols = [{ini.routing.proto}]; % add more protocols into simulation if needed: [{'proto1'},{'proto2'}]
+Protocols = getproto(ini.routing.proto);
 
 %% Agents used in this simulation -----------------------------
 if ini.agents.retain == 0
