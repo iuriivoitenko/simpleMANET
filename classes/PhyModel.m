@@ -12,7 +12,7 @@ classdef PhyModel < handle
 
     properties (Access = private)
         radio
-        bypass = 0
+        enable = 0
         sending
     end
 
@@ -31,19 +31,33 @@ classdef PhyModel < handle
     end
     
     methods
-        function obj = PhyModel( bypassrange, range )
+        function obj = PhyModel( range, ini )
             obj.radio = range;
-            obj.bypass = bypassrange;
             obj.sending = 0;
+            obj.load(ini);
         end
             
         % communication range 
         function r = range( obj )
-            if obj.bypass == 1
+            if obj.enable == 0
                 r = obj.radio;
             else                
                 r = friis(obj.freq, obj.Pr, obj.Pt, obj.Gt, obj.Gr, obj.L, obj.Fade);
             end            
+        end
+        
+        function obj = load(obj, ini)
+            obj.enable = ini.enable;            % enable real RF range calculation based on PHY params and friis formula
+            obj.freq = ini.freq;                % carrier frequency, Hz
+            obj.modulation = ini.modulation;    % modulation scheme
+            obj.bitrate = ini.bitrate;          % bitrate, b/s
+            obj.coding = ini.coding;            % coding rate
+            obj.Pt = ini.Pt;                    % Tx power, dBm
+            obj.Pr = ini.Pr;                    % Rx sensitivity, dBm
+            obj.Gt = ini.Gt;                    % Tx antenna gain, dBi
+            obj.Gr = ini.Gr;                    % Rx antenna gain, dBi
+            obj.L = ini.L;                      % other losses, dB
+            obj.Fade = ini.Fade;                % fade margin, dB
         end
         
         % how long a given packet is being transmitted, ms
