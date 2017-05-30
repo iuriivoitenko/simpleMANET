@@ -127,7 +127,7 @@ for t = 1:ini.globals.SAMPLING:ini.globals.SIMTIME
             % end
         end
         if ini.visuals.showsender == 1 && ~isempty(message)
-            circle2(Nodes(j).x,Nodes(j).y,30); % highlight the tx node
+            drawcircle(Nodes(j).x,Nodes(j).y,30); % highlight the tx node
         end
         
         % loop thru neighbors 

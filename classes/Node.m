@@ -174,6 +174,10 @@ classdef Node < handle
               obj.link.lastlen = pkt.len; % put length of this packet into link layer
               type = pkt.getType;         % get the packet type      
               p = p + 1;                  % global increment of packets TX
+              
+              if obj.link.checkLinkBusy(t) == 1
+                  return;
+              end
                   
               obj.link.linkLockTx(obj.id, obj.phy.duration(pkt.len), pkt); % enable MAC protocol
               notify(obj,'PacketStart');   % start sending packet immediately

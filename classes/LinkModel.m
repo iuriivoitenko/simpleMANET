@@ -8,9 +8,9 @@ classdef LinkModel < handle
         proto
         busy
         until
-        lastlen
         enabled
         src
+        lastlen = 0;
         collisions = 0;
         carrier = 0;
         err
@@ -42,17 +42,61 @@ classdef LinkModel < handle
             obj.id = id;            
             obj.busy = 0;
             obj.until = 0;
-            obj.lastlen = 0;
             obj.enabled = ena;
+            obj.lastlen = 0;
             obj.collisions = 0;
             obj.err = 0;
             obj.src = '';
-            obj.proto = proto;
+            obj.proto = upper(char(proto));
             
         end
                 
         function n = get.proto( obj )
             n = obj.proto;
+        end
+        
+        function b = checkLinkBusy( obj, t )
+            % each protocol has its own check link state 
+            switch obj.proto
+                case 'ALOHA'
+                    b = 0;
+                case 'CSMA' 
+                    if obj.busy == 0 % send, if channel idle
+                        obj.mac.flush();
+                        b = 0;
+                    else                        
+                        if obj.mac.retry < obj.mac.maxretry
+                            if obj.mac.timeout == 0 % timer not running
+                                obj.mac.retry = 1;
+                                obj.mac.backoff = obj.mac.RandomBackoff;
+                                obj.mac.timeout = t + obj.mac.backoff;
+                                b = 1; % start timer
+                            elseif obj.mac.timeout >= t % timer expired
+                                if obj.busy == 1 % channel is still busy, increase retry and backoff timer
+                                    obj.mac.retry = obj.mac.retry + 1;
+                                    obj.mac.timeout = t + (obj.mac.backoff * obj.mac.retry);
+                                    b = 1;
+                                else % channel is idle, send packet now
+                                    obj.mac.flush();
+                                    b = 0; 
+                                end
+                            else                                
+                                b = 1; % timer not expired
+                            end
+                        else
+                            obj.mac.flush();
+                            b = 1; % drop
+                        end
+                    end
+                case 'S-ALOHA' 
+                    b = 0;
+                case 'TDMA' 
+                    b = 0;
+                case 'CSMA-CA'
+                    b = 0;
+                otherwise
+                    error('Unsupported MAC protocol');
+            end 
         end
         
         function b = isBusy( obj )
@@ -62,17 +106,25 @@ classdef LinkModel < handle
                 return;
             end
             
-            if (obj.err == 1)
-                b = 1;
-            elseif obj.busy > 0 && obj.err == 0 
-                b = 1;
-                obj.collisions = obj.collisions + 1;
-                warning('Collision detected at Node %d', obj.id);
-            elseif obj.busy > 0
-                b = 1;
-            else
-                b = 0;
-            end
+            % each protocol has its own busy state 
+            switch obj.proto
+                case 'ALOHA'
+                    [b, c] = obj.mac.isBusy(obj.err, obj.busy);
+                    if c == 1
+                        obj.collisions = obj.collisions + 1;
+                        warning('Collision detected at Node %d', obj.id);
+                    end
+                case 'CSMA' 
+                    b = 0;
+                case 'S-ALOHA' 
+                    b = 0;
+                case 'TDMA' 
+                    b = 0;
+                case 'CSMA-CA'
+                    b = 0;
+                otherwise
+                    error('Unsupported MAC protocol');
+            end                                                                                               
         end
         
         function obj = linkLockTx(obj,src,time,pkt)
