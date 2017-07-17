@@ -67,6 +67,7 @@ classdef Node < handle
         neighbor
         hlmrp
         odmrp
+        icmpv6
         % newproto
     end
     
@@ -102,6 +103,8 @@ classdef Node < handle
                         obj.hlmrp = HLMRP(id, agent, apps);
                     case 'ODMRP'
                         obj.odmrp = ODMRP(id, agent, apps);
+                    case 'ICMPV6'
+                        obj.icmpv6 = ICMPv6;
                     % case 'NEWPROTO'
                     %   obj.newproto = NewProto(id);
                     otherwise
@@ -153,6 +156,14 @@ classdef Node < handle
           if isempty(obj.odmrp) == 0
               [obj.odmrp, pkt] = obj.odmrp.timeout(delay, t);
               if obj.odmrp.result > 0 % packet generated on timeout              
+                  obj.send_pkt(pkt);
+              end    
+          end
+          
+          % ICMPv6 protocol timeout function
+          if isempty(obj.icmpv6) == 0
+              [obj.icmpv6, pkt] = obj.icmpv6.timeout(delay, t);
+              if obj.icmpv6.result > 0 % packet generated on timeout              
                   obj.send_pkt(pkt);
               end    
           end
@@ -222,7 +233,11 @@ classdef Node < handle
                               otherwise
                                     obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, ODMRP packet unknown\n', p, t, pkt.src, pkt.dst);
                            end
-                           end
+                          end
+                      case 'ICMPv6'
+                          if obj.icmpv6.show == 1
+                              obj.msg=sprintf('%d. time: %d ms, SRC: %d, DST: %d, ICMPv6 packet unknown\n', p, t, pkt.src, pkt.dst);
+                          end
                       % case 'NEWPROTO'
                       %     obj.msg=sprintf('bla bla bla\n');
                       otherwise

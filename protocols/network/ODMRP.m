@@ -43,6 +43,7 @@ classdef ODMRP < IPv6
         groups_tx
         groups_rx
         mdata
+        app
         jreq        
         jtable
         rtable
@@ -80,7 +81,7 @@ classdef ODMRP < IPv6
             obj.member_table = containers.Map;
             obj.member_cache = table;
             
-            % here we define protocol messages 
+            % here we define protocol messages as structures
             obj.jreq = struct('ver',0,'type','JOIN REQ','reserved',0,'ttl',obj.TTL_VALUE,...
                 'hops',0,'mgroup','A','seq',0,'src',id,'prev',id);            
             
@@ -100,12 +101,8 @@ classdef ODMRP < IPv6
                 obj = obj.insertIntoMessageCache(id,id,0,id,'N',0);
             end
             
-            switch app.data
-                case 'CBR'
-                    obj.dataperiod = app.period;
-                otherwise
-                    obj.dataperiod = 0;
-            end
+            % application data handled in class AppModel
+            obj.app = AppModel(app.data, app.packetlen, app.period, app.packetnum);
              
         end
         
@@ -134,19 +131,17 @@ classdef ODMRP < IPv6
             pkt = [];
             obj.timestamp = t; % remember local time
             obj.timer = obj.timer + d;
-            obj.fgtimer = obj.fgtimer + d;
-            obj.datatimer = obj.datatimer + d;
+            obj.fgtimer = obj.fgtimer + d;            
             if (obj.timer >= obj.MEM_REFRESH && obj.isSender == 1)
                 obj.timer = mod(obj.MEM_REFRESH, d);
                 s = numel(obj.groups_tx);
                 for i=1:s
                     [obj, pkt] = obj.send_join_req(obj.groups_tx(i));                                       
                     obj.result = pkt.len;
-                end
-            elseif (obj.datatimer >= obj.dataperiod && obj.isSender == 1)
-                obj.datatimer = mod(obj.datatimer, d);
+                end               
+            elseif (obj.app.timeout(d,t) > 0 && obj.isSender == 1)    
                 [obj, pkt] = obj.send_mdata(obj.groups_tx(1));
-                obj.result = pkt.len;
+                obj.result = pkt.len;    
                 
             elseif (obj.timer >= obj.JT_REFRESH && obj.isReceiver == 1)                
                 obj.timer = mod(obj.JT_REFRESH, d);
